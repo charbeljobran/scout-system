@@ -11,6 +11,21 @@ const emptyForm = {
   quantityInUse: 0,
 };
 
+const toInventoryItem = (row) => ({
+  id: row.id,
+  name: row.name,
+  category: row.category,
+  quantity: row.quantity,
+  quantityInUse: row.quantity_in_use ?? row.quantityInUse ?? 0,
+});
+
+const toItemRow = (item) => ({
+  name: item.name,
+  category: item.category,
+  quantity: item.quantity,
+  quantity_in_use: item.quantityInUse,
+});
+
 export default function Inventory() {
   const [search, setSearch] = useState('');
   const [items, setItems] = useState([]);
@@ -20,6 +35,7 @@ export default function Inventory() {
   const [form, setForm] = useState(emptyForm);
   const [removeAmounts, setRemoveAmounts] = useState({});
   const [removingItemId, setRemovingItemId] = useState(null);
+  const [inventoryError, setInventoryError] = useState('');
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -35,8 +51,10 @@ export default function Inventory() {
 
       if (error) {
         console.error('Error fetching items:', error);
+        setInventoryError(error.message || 'Could not load inventory items.');
       } else {
-        setItems(data);
+        setItems(data.map(toInventoryItem));
+        setInventoryError('');
       }
       setLoading(false);
     };
@@ -119,6 +137,7 @@ export default function Inventory() {
 
   const handleAddItem = async (event) => {
     event.preventDefault();
+    setInventoryError('');
     const itemName = form.name.trim();
     const quantity = Number(form.quantity);
     const quantityInUse = Math.min(Number(form.quantityInUse), quantity);
@@ -135,7 +154,7 @@ export default function Inventory() {
         .from('items')
         .update({
           quantity: existingItem.quantity + quantity,
-          quantityInUse: existingItem.quantityInUse + quantityInUse,
+          quantity_in_use: existingItem.quantityInUse + quantityInUse,
         })
         .eq('id', existingItem.id)
         .select()
@@ -143,18 +162,26 @@ export default function Inventory() {
 
       if (!error) {
         setItems((current) =>
-          current.map((item) => (item.id === existingItem.id ? data : item)),
+          current.map((item) => (item.id === existingItem.id ? toInventoryItem(data) : item)),
         );
+      } else {
+        console.error('Error updating item:', error);
+        setInventoryError(error.message || 'Could not update this item.');
+        return;
       }
     } else {
       const { data, error } = await supabase
         .from('items')
-        .insert({ name: itemName, category: form.category, quantity, quantityInUse })
+        .insert(toItemRow({ name: itemName, category: form.category, quantity, quantityInUse }))
         .select()
         .single();
 
       if (!error) {
-        setItems((current) => [data, ...current]);
+        setItems((current) => [toInventoryItem(data), ...current]);
+      } else {
+        console.error('Error adding item:', error);
+        setInventoryError(error.message || 'Could not save this item.');
+        return;
       }
     }
 
@@ -197,21 +224,26 @@ export default function Inventory() {
   };
 
   const handleRemoveItem = async (item) => {
+    setInventoryError('');
     const amountToRemove = getRemoveAmount(item);
     const newQuantity = item.quantity - amountToRemove;
     const newQuantityInUse = Math.min(item.quantityInUse, newQuantity);
 
     const { data, error } = await supabase
       .from('items')
-      .update({ quantity: newQuantity, quantityInUse: newQuantityInUse })
+      .update({ quantity: newQuantity, quantity_in_use: newQuantityInUse })
       .eq('id', item.id)
       .select()
       .single();
 
     if (!error) {
       setItems((current) =>
-        current.map((currentItem) => (currentItem.id === item.id ? data : currentItem)),
+        current.map((currentItem) => (currentItem.id === item.id ? toInventoryItem(data) : currentItem)),
       );
+    } else {
+      console.error('Error removing item quantity:', error);
+      setInventoryError(error.message || 'Could not remove this item quantity.');
+      return;
     }
 
     setRemoveAmounts((current) => {
@@ -223,44 +255,58 @@ export default function Inventory() {
   };
 
   const handleDeleteAll = async () => {
-    await supabase.from('items').delete().neq('id', 0);
+    setInventoryError('');
+    const { error } = await supabase.from('items').delete().neq('id', 0);
+    if (error) {
+      console.error('Error deleting inventory:', error);
+      setInventoryError(error.message || 'Could not delete inventory items.');
+      return;
+    }
     setItems([]);
     setCategory('');
   };
 
   const adjustInUse = async (item, direction) => {
+    setInventoryError('');
     const newQuantityInUse = Math.min(Math.max(item.quantityInUse + direction, 0), item.quantity);
 
     const { data, error } = await supabase
       .from('items')
-      .update({ quantityInUse: newQuantityInUse })
+      .update({ quantity_in_use: newQuantityInUse })
       .eq('id', item.id)
       .select()
       .single();
 
     if (!error) {
       setItems((current) =>
-        current.map((currentItem) => (currentItem.id === item.id ? data : currentItem)),
+        current.map((currentItem) => (currentItem.id === item.id ? toInventoryItem(data) : currentItem)),
       );
+    } else {
+      console.error('Error updating in-use quantity:', error);
+      setInventoryError(error.message || 'Could not update in-use quantity.');
     }
   };
 
   const handleInUseChange = async (item, value) => {
+    setInventoryError('');
     const parsed = value === '' ? 0 : Number(value);
     if (!Number.isFinite(parsed)) return;
     const newQuantityInUse = Math.min(Math.max(parsed, 0), item.quantity);
 
     const { data, error } = await supabase
       .from('items')
-      .update({ quantityInUse: newQuantityInUse })
+      .update({ quantity_in_use: newQuantityInUse })
       .eq('id', item.id)
       .select()
       .single();
 
     if (!error) {
       setItems((current) =>
-        current.map((currentItem) => (currentItem.id === item.id ? data : currentItem)),
+        current.map((currentItem) => (currentItem.id === item.id ? toInventoryItem(data) : currentItem)),
       );
+    } else {
+      console.error('Error updating in-use quantity:', error);
+      setInventoryError(error.message || 'Could not update in-use quantity.');
     }
   };
 
@@ -297,6 +343,18 @@ export default function Inventory() {
       <button className="stepper-button" type="button" disabled={item.quantityInUse >= item.quantity} onClick={() => adjustInUse(item, 1)}>+</button>
     </div>
   );
+
+  const ItemActions = ({ item }) => {
+    if (item.quantity <= 0) {
+      return <span className="table-action-status">No stock</span>;
+    }
+
+    return removingItemId === item.id ? (
+      <RemoveControls item={item} />
+    ) : (
+      <button className="table-action" type="button" onClick={() => startRemovingItem(item.id)}>Remove</button>
+    );
+  };
 
   if (loading) {
     return (
@@ -361,6 +419,13 @@ export default function Inventory() {
           </button>
         </div>
       </div>
+
+      {inventoryError && (
+        <section className="panel accent-red" role="alert">
+          <p className="eyebrow">Database error</p>
+          <p>{inventoryError}</p>
+        </section>
+      )}
 
       {/* Add Item Form */}
       {isAdding && (
@@ -468,13 +533,7 @@ export default function Inventory() {
                     <td>{item.quantity}</td>
                     <td><InUseControls item={item} /></td>
                     <td><StatusBadge item={item} /></td>
-                    <td>
-                      {removingItemId === item.id ? (
-                        <RemoveControls item={item} />
-                      ) : (
-                        <button className="table-action" type="button" onClick={() => startRemovingItem(item.id)}>Remove</button>
-                      )}
-                    </td>
+                    <td><ItemActions item={item} /></td>
                   </tr>
                 ))
               ) : (
@@ -511,11 +570,7 @@ export default function Inventory() {
                 </div>
               </div>
               <div className="inventory-card__footer">
-                {removingItemId === item.id ? (
-                  <RemoveControls item={item} />
-                ) : (
-                  <button className="table-action" type="button" onClick={() => startRemovingItem(item.id)}>Remove</button>
-                )}
+                <ItemActions item={item} />
               </div>
             </article>
           ))

@@ -479,6 +479,20 @@ tbody tr:last-child td {
   color: #76716c;
 }
 
+.table-action-status {
+  align-items: center;
+  background: #f4f1ed;
+  border: 1px solid #ddd6cf;
+  border-radius: 8px;
+  color: #76716c;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
 .stepper {
   display: inline-grid;
   grid-template-columns: 32px 40px 32px;
