@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { getStatus } from '../data/inventory.js';
-import { supabase } from '../lib/supabase.js';
+import { supabase, supabaseConfigError } from '../lib/supabase.js';
 
 const categoryOptions = ['Gear', 'Equipment', 'Cooking'];
 const emptyForm = {
@@ -23,6 +23,11 @@ export default function Inventory() {
 
   useEffect(() => {
     const fetchItems = async () => {
+      if (!supabase) {
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('items')
         .select('*')
@@ -297,6 +302,18 @@ export default function Inventory() {
     return (
       <main className="page-shell">
         <p style={{ textAlign: 'center', color: '#888888', padding: '40px' }}>Loading inventory...</p>
+      </main>
+    );
+  }
+
+  if (supabaseConfigError) {
+    return (
+      <main className="page-shell">
+        <section className="panel accent-orange">
+          <p className="eyebrow">Configuration needed</p>
+          <h1>Inventory is not connected yet</h1>
+          <p>{supabaseConfigError}</p>
+        </section>
       </main>
     );
   }
