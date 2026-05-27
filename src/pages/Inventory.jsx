@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import StatusBadge from '../components/StatusBadge.jsx';
-import { getStatus, initialItems } from '../data/inventory.js';
+import { getStatus } from '../data/inventory.js';
+import { supabase } from '../lib/supabase.js';
 
 const categoryOptions = ['Gear', 'Equipment', 'Cooking'];
 const emptyForm = {
@@ -12,12 +13,31 @@ const emptyForm = {
 
 export default function Inventory() {
   const [search, setSearch] = useState('');
-  const [items, setItems] = useState(initialItems);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [removeAmounts, setRemoveAmounts] = useState({});
   const [removingItemId, setRemovingItemId] = useState(null);
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      const { data, error } = await supabase
+        .from('items')
+        .select('*')
+        .order('id', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching items:', error);
+      } else {
+        setItems(data);
+      }
+      setLoading(false);
+    };
+
+    fetchItems();
+  }, []);
 
   const filteredItems = useMemo(
     () =>
@@ -92,38 +112,46 @@ export default function Inventory() {
     }));
   };
 
-  const handleAddItem = (event) => {
+  const handleAddItem = async (event) => {
     event.preventDefault();
     const itemName = form.name.trim();
     const quantity = Number(form.quantity);
     const quantityInUse = Math.min(Number(form.quantityInUse), quantity);
     if (!itemName || quantity < 1) return;
 
-    setItems((currentItems) => {
-      const existingItem = currentItems.find(
-        (item) =>
-          item.name.toLowerCase() === itemName.toLowerCase() &&
-          item.category.toLowerCase() === form.category.toLowerCase(),
-      );
+    const existingItem = items.find(
+      (item) =>
+        item.name.toLowerCase() === itemName.toLowerCase() &&
+        item.category.toLowerCase() === form.category.toLowerCase(),
+    );
 
-      if (existingItem) {
-        return currentItems.map((item) =>
-          item.id === existingItem.id
-            ? {
-                ...item,
-                quantity: item.quantity + quantity,
-                quantityInUse: item.quantityInUse + quantityInUse,
-              }
-            : item,
+    if (existingItem) {
+      const { data, error } = await supabase
+        .from('items')
+        .update({
+          quantity: existingItem.quantity + quantity,
+          quantityInUse: existingItem.quantityInUse + quantityInUse,
+        })
+        .eq('id', existingItem.id)
+        .select()
+        .single();
+
+      if (!error) {
+        setItems((current) =>
+          current.map((item) => (item.id === existingItem.id ? data : item)),
         );
       }
+    } else {
+      const { data, error } = await supabase
+        .from('items')
+        .insert({ name: itemName, category: form.category, quantity, quantityInUse })
+        .select()
+        .single();
 
-      const nextId = currentItems.length ? Math.max(...currentItems.map((item) => item.id)) + 1 : 1;
-      return [
-        { id: nextId, name: itemName, category: form.category, quantity, quantityInUse },
-        ...currentItems,
-      ];
-    });
+      if (!error) {
+        setItems((current) => [data, ...current]);
+      }
+    }
 
     setForm(emptyForm);
     setIsAdding(false);
@@ -163,19 +191,24 @@ export default function Inventory() {
     return Math.min(requestedAmount, Math.max(item.quantity, 1));
   };
 
-  const handleRemoveItem = (item) => {
+  const handleRemoveItem = async (item) => {
     const amountToRemove = getRemoveAmount(item);
-    setItems((currentItems) =>
-      currentItems.map((currentItem) =>
-        currentItem.id === item.id
-          ? {
-              ...currentItem,
-              quantity: currentItem.quantity - amountToRemove,
-              quantityInUse: Math.min(currentItem.quantityInUse, currentItem.quantity - amountToRemove),
-            }
-          : currentItem,
-      ),
-    );
+    const newQuantity = item.quantity - amountToRemove;
+    const newQuantityInUse = Math.min(item.quantityInUse, newQuantity);
+
+    const { data, error } = await supabase
+      .from('items')
+      .update({ quantity: newQuantity, quantityInUse: newQuantityInUse })
+      .eq('id', item.id)
+      .select()
+      .single();
+
+    if (!error) {
+      setItems((current) =>
+        current.map((currentItem) => (currentItem.id === item.id ? data : currentItem)),
+      );
+    }
+
     setRemoveAmounts((current) => {
       const next = { ...current };
       delete next[item.id];
@@ -184,42 +217,46 @@ export default function Inventory() {
     setRemovingItemId(null);
   };
 
-  const handleDeleteAll = () => {
+  const handleDeleteAll = async () => {
+    await supabase.from('items').delete().neq('id', 0);
     setItems([]);
     setCategory('');
   };
 
-  const adjustInUse = (item, direction) => {
-    setItems((current) =>
-      current.map((currentItem) =>
-        currentItem.id === item.id
-          ? {
-              ...currentItem,
-              quantityInUse: Math.min(Math.max(currentItem.quantityInUse + direction, 0), currentItem.quantity),
-            }
-          : currentItem,
-      ),
-    );
+  const adjustInUse = async (item, direction) => {
+    const newQuantityInUse = Math.min(Math.max(item.quantityInUse + direction, 0), item.quantity);
+
+    const { data, error } = await supabase
+      .from('items')
+      .update({ quantityInUse: newQuantityInUse })
+      .eq('id', item.id)
+      .select()
+      .single();
+
+    if (!error) {
+      setItems((current) =>
+        current.map((currentItem) => (currentItem.id === item.id ? data : currentItem)),
+      );
+    }
   };
 
-  const handleInUseChange = (item, value) => {
-    if (value === '') {
-      setItems((current) =>
-        current.map((currentItem) =>
-          currentItem.id === item.id ? { ...currentItem, quantityInUse: 0 } : currentItem,
-        ),
-      );
-      return;
-    }
-    const parsed = Number(value);
+  const handleInUseChange = async (item, value) => {
+    const parsed = value === '' ? 0 : Number(value);
     if (!Number.isFinite(parsed)) return;
-    setItems((current) =>
-      current.map((currentItem) =>
-        currentItem.id === item.id
-          ? { ...currentItem, quantityInUse: Math.min(Math.max(parsed, 0), currentItem.quantity) }
-          : currentItem,
-      ),
-    );
+    const newQuantityInUse = Math.min(Math.max(parsed, 0), item.quantity);
+
+    const { data, error } = await supabase
+      .from('items')
+      .update({ quantityInUse: newQuantityInUse })
+      .eq('id', item.id)
+      .select()
+      .single();
+
+    if (!error) {
+      setItems((current) =>
+        current.map((currentItem) => (currentItem.id === item.id ? data : currentItem)),
+      );
+    }
   };
 
   const RemoveControls = ({ item }) => (
@@ -255,6 +292,14 @@ export default function Inventory() {
       <button className="stepper-button" type="button" disabled={item.quantityInUse >= item.quantity} onClick={() => adjustInUse(item, 1)}>+</button>
     </div>
   );
+
+  if (loading) {
+    return (
+      <main className="page-shell">
+        <p style={{ textAlign: 'center', color: '#888888', padding: '40px' }}>Loading inventory...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="page-shell">
