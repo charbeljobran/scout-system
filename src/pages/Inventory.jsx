@@ -36,6 +36,7 @@ export default function Inventory() {
   const [removeAmounts, setRemoveAmounts] = useState({});
   const [removingItemId, setRemovingItemId] = useState(null);
   const [inventoryError, setInventoryError] = useState('');
+  const [inUseDrafts, setInUseDrafts] = useState({});
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -264,30 +265,18 @@ export default function Inventory() {
     }
     setItems([]);
     setCategory('');
+    setInUseDrafts({});
   };
 
-  const adjustInUse = async (item, direction) => {
-    setInventoryError('');
-    const newQuantityInUse = Math.min(Math.max(item.quantityInUse + direction, 0), item.quantity);
-
-    const { data, error } = await supabase
-      .from('items')
-      .update({ quantity_in_use: newQuantityInUse })
-      .eq('id', item.id)
-      .select()
-      .single();
-
-    if (!error) {
-      setItems((current) =>
-        current.map((currentItem) => (currentItem.id === item.id ? toInventoryItem(data) : currentItem)),
-      );
-    } else {
-      console.error('Error updating in-use quantity:', error);
-      setInventoryError(error.message || 'Could not update in-use quantity.');
-    }
+  const clearInUseDraft = (id) => {
+    setInUseDrafts((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
   };
 
-  const handleInUseChange = async (item, value) => {
+  const saveInUseQuantity = async (item, value) => {
     setInventoryError('');
     const parsed = value === '' ? 0 : Number(value);
     if (!Number.isFinite(parsed)) return;
@@ -304,13 +293,35 @@ export default function Inventory() {
       setItems((current) =>
         current.map((currentItem) => (currentItem.id === item.id ? toInventoryItem(data) : currentItem)),
       );
+      clearInUseDraft(item.id);
     } else {
       console.error('Error updating in-use quantity:', error);
       setInventoryError(error.message || 'Could not update in-use quantity.');
     }
   };
 
-  const RemoveControls = ({ item }) => (
+  const adjustInUse = async (item, direction) => {
+    clearInUseDraft(item.id);
+    await saveInUseQuantity(item, item.quantityInUse + direction);
+  };
+
+  const handleInUseDraftChange = (item, value) => {
+    if (value !== '' && !Number.isFinite(Number(value))) return;
+    setInUseDrafts((current) => ({ ...current, [item.id]: value }));
+  };
+
+  const handleInUseKeyDown = (event, item) => {
+    if (event.key === 'Enter') {
+      event.currentTarget.blur();
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      clearInUseDraft(item.id);
+    }
+  };
+
+  const renderRemoveControls = (item) => (
     <div className="remove-confirm">
       <div className="stepper">
         <button className="stepper-button" type="button" disabled={getRemoveAmount(item) <= 1} onClick={() => adjustRemoveAmount(item, -1)}>-</button>
@@ -329,7 +340,7 @@ export default function Inventory() {
     </div>
   );
 
-  const InUseControls = ({ item }) => (
+  const renderInUseControls = (item) => (
     <div className="stepper">
       <button className="stepper-button" type="button" disabled={item.quantityInUse <= 0} onClick={() => adjustInUse(item, -1)}>-</button>
       <input
@@ -337,20 +348,22 @@ export default function Inventory() {
         type="number"
         min="0"
         max={item.quantity}
-        value={item.quantityInUse}
-        onChange={(e) => handleInUseChange(item, e.target.value)}
+        value={inUseDrafts[item.id] ?? item.quantityInUse}
+        onChange={(e) => handleInUseDraftChange(item, e.target.value)}
+        onBlur={(e) => saveInUseQuantity(item, e.target.value)}
+        onKeyDown={(e) => handleInUseKeyDown(e, item)}
       />
       <button className="stepper-button" type="button" disabled={item.quantityInUse >= item.quantity} onClick={() => adjustInUse(item, 1)}>+</button>
     </div>
   );
 
-  const ItemActions = ({ item }) => {
+  const renderItemActions = (item) => {
     if (item.quantity <= 0) {
       return <span className="table-action-status">No stock</span>;
     }
 
     return removingItemId === item.id ? (
-      <RemoveControls item={item} />
+      renderRemoveControls(item)
     ) : (
       <button className="table-action" type="button" onClick={() => startRemovingItem(item.id)}>Remove</button>
     );
@@ -531,9 +544,9 @@ export default function Inventory() {
                     <td className="item-name">{item.name}</td>
                     <td>{item.category}</td>
                     <td>{item.quantity}</td>
-                    <td><InUseControls item={item} /></td>
+                    <td>{renderInUseControls(item)}</td>
                     <td><StatusBadge item={item} /></td>
-                    <td><ItemActions item={item} /></td>
+                    <td>{renderItemActions(item)}</td>
                   </tr>
                 ))
               ) : (
@@ -566,11 +579,11 @@ export default function Inventory() {
                 </div>
                 <div className="inventory-card__row">
                   <span className="eyebrow">In Use</span>
-                  <InUseControls item={item} />
+                  {renderInUseControls(item)}
                 </div>
               </div>
               <div className="inventory-card__footer">
-                <ItemActions item={item} />
+                {renderItemActions(item)}
               </div>
             </article>
           ))
