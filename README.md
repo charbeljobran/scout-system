@@ -1,6 +1,6 @@
 # Scout Inventory
 
-A React.js inventory dashboard for Scout Du Liban-MW, built with Vite.
+A Next.js inventory dashboard for Scout Du Liban-MW, built with TypeScript.
 
 ## Getting Started
 
@@ -16,21 +16,20 @@ Run the development server:
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Scripts
 
 ```bash
 npm run dev
 npm run build
-npm run preview
+npm run start
 npm run lint
 ```
 
 ## Project Structure
 
-- `src/main.jsx` mounts the React app.
-- `src/App.jsx` handles client-side navigation.
-- `src/pages/` contains the Home, Inventory, About, and Contact views.
+- `src/app/` contains the Next.js app router pages and root layout.
 - `src/components/` contains shared UI.
-- `src/styles.css` contains the app styling.
+- `src/app/globals.css` contains the app styling.
+- `src/data/` and `src/lib/` contain typed data and Supabase helpers.
