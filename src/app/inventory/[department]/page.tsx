@@ -32,6 +32,13 @@ type HistoryRow = {
   created_at: string;
 };
 
+type ItemUsageRow = {
+  id: number;
+  item_id: number;
+  user_email: string;
+  quantity_in_use: number;
+};
+
 type InventoryForm = {
   name: string;
   category: InventoryCategory;
@@ -40,11 +47,11 @@ type InventoryForm = {
 };
 
 type AmountDrafts = Record<number, number | ''>;
-type InUseDrafts = Record<number, number | string>;
+type MyUsageDrafts = Record<number, number | string>;
 
 const categoryOptionsByDepartment: Record<InventoryDepartment, InventoryCategory[]> = {
   intendant: ['Cooking'],
-  materiel: [ 'Equipment', 'Stationery'],
+  materiel: ['Equipment', 'Stationery'],
 };
 
 const departmentLabels: Record<InventoryDepartment, string> = {
@@ -64,6 +71,14 @@ const formatDate = (iso: string) => {
   const d = new Date(iso);
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) +
     ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatUserEmail = (email: string) => {
+  const name = email.split('@')[0];
+  return name
+    .split('.')
+    .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 };
 
 export default function DepartmentInventory() {
@@ -89,23 +104,42 @@ export default function DepartmentInventory() {
   const [form, setForm] = useState<InventoryForm>(emptyForm);
   const [removeAmounts, setRemoveAmounts] = useState<AmountDrafts>({});
   const [removingItemId, setRemovingItemId] = useState<number | null>(null);
-  const [inUseDrafts, setInUseDrafts] = useState<InUseDrafts>({});
   const [error, setError] = useState('');
   const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const [myUsage, setMyUsage] = useState<Record<number, number>>({});
+  const [myUsageDrafts, setMyUsageDrafts] = useState<MyUsageDrafts>({});
 
   useEffect(() => {
-    const fetchItems = async () => {
+    const fetchAll = async () => {
       try {
-        const { data, error } = await supabase
+        const { data: userData } = await supabase.auth.getUser();
+        const email = userData.user?.email ?? '';
+        setUserEmail(email);
+
+        const { data: itemData, error: itemError } = await supabase
           .from('items')
           .select('*')
           .in('category', categories)
           .order('id', { ascending: false });
-        if (error) setError('Could not load items.');
-        else setItems((data as ItemRow[]).map(toInventoryItem));
+
+        if (itemError) { setError('Could not load items.'); return; }
+        setItems((itemData as ItemRow[]).map(toInventoryItem));
+
+        if (email) {
+          const { data: usageData } = await supabase
+            .from('item_usage')
+            .select('*')
+            .eq('user_email', email);
+
+          const usageMap: Record<number, number> = {};
+          (usageData as ItemUsageRow[] ?? []).forEach(u => {
+            usageMap[u.item_id] = u.quantity_in_use;
+          });
+          setMyUsage(usageMap);
+        }
       } catch {
         setError('Could not connect to Supabase.');
       } finally {
@@ -113,14 +147,43 @@ export default function DepartmentInventory() {
       }
     };
 
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUserEmail(data.user?.email ?? '');
-    };
-
-    fetchItems();
-    fetchUser();
+    fetchAll();
   }, [dept]);
+
+  const logHistory = async (item: InventoryItem, action: string, quantityChanged: number) => {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+    const { data: existing } = await supabase
+      .from('history')
+      .select('*')
+      .eq('item_id', item.id)
+      .eq('user_email', userEmail)
+      .eq('action', action)
+      .gte('created_at', fiveMinutesAgo)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const row = existing?.[0];
+
+    if (row) {
+      await supabase
+        .from('history')
+        .update({
+          quantity_changed: row.quantity_changed + quantityChanged,
+          created_at: new Date().toISOString(),
+        })
+        .eq('id', row.id);
+    } else {
+      await supabase.from('history').insert({
+        item_id: item.id,
+        item_name: item.name,
+        category: item.category,
+        quantity_changed: quantityChanged,
+        action,
+        user_email: userEmail,
+      });
+    }
+  };
 
   const openHistory = async (item: InventoryItem) => {
     setHistoryItem(item);
@@ -137,15 +200,68 @@ export default function DepartmentInventory() {
 
   const closeHistory = () => { setHistoryItem(null); setHistory([]); };
 
-  const logHistory = async (item: InventoryItem, action: string, quantityChanged: number) => {
-    await supabase.from('history').insert({
+  const saveMyUsage = async (item: InventoryItem, newMyQty: number) => {
+    const oldMyQty = myUsage[item.id] ?? 0;
+    const diff = newMyQty - oldMyQty;
+    if (diff === 0) return;
+
+    const othersInUse = item.quantityInUse - oldMyQty;
+    const newTotal = othersInUse + newMyQty;
+    if (newTotal > item.quantity) return;
+
+    await supabase.from('item_usage').upsert({
       item_id: item.id,
-      item_name: item.name,
-      category: item.category,
-      quantity_changed: quantityChanged,
-      action,
       user_email: userEmail,
-    });
+      quantity_in_use: newMyQty,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'item_id,user_email' });
+
+    const { data } = await supabase
+      .from('items')
+      .update({ quantity_in_use: newTotal })
+      .eq('id', item.id)
+      .select()
+      .single();
+
+    if (data) {
+      setItems(prev => prev.map(i => i.id === item.id ? toInventoryItem(data as ItemRow) : i));
+    }
+
+    setMyUsage(prev => ({ ...prev, [item.id]: newMyQty }));
+    clearMyUsageDraft(item.id);
+    await logHistory(item, diff > 0 ? 'Marked in use' : 'Returned from use', Math.abs(diff));
+  };
+
+  const adjustMyUsage = async (item: InventoryItem, dir: number) => {
+    const current = myUsage[item.id] ?? 0;
+    const othersInUse = item.quantityInUse - current;
+    const maxAllowed = item.quantity - othersInUse;
+    const newVal = Math.min(Math.max(current + dir, 0), maxAllowed);
+    clearMyUsageDraft(item.id);
+    await saveMyUsage(item, newVal);
+  };
+
+  const clearMyUsageDraft = (id: number) =>
+    setMyUsageDrafts(prev => { const n = { ...prev }; delete n[id]; return n; });
+
+  const handleMyUsageDraftChange = (item: InventoryItem, value: string) => {
+    if (value !== '' && !Number.isFinite(Number(value))) return;
+    setMyUsageDrafts(prev => ({ ...prev, [item.id]: value }));
+  };
+
+  const handleMyUsageBlur = (item: InventoryItem, value: string) => {
+    const parsed = value === '' ? 0 : Number(value);
+    if (!isFinite(parsed)) return;
+    const current = myUsage[item.id] ?? 0;
+    const othersInUse = item.quantityInUse - current;
+    const maxAllowed = item.quantity - othersInUse;
+    const clamped = Math.min(Math.max(parsed, 0), maxAllowed);
+    saveMyUsage(item, clamped);
+  };
+
+  const handleMyUsageKeyDown = (e: KeyboardEvent<HTMLInputElement>, item: InventoryItem) => {
+    if (e.key === 'Enter') { e.currentTarget.blur(); return; }
+    if (e.key === 'Escape') clearMyUsageDraft(item.id);
   };
 
   const filteredItems = useMemo(() =>
@@ -210,7 +326,6 @@ export default function DepartmentInventory() {
     e.preventDefault();
     const itemName = form.name.trim();
     const quantity = Number(form.quantity);
-    const quantityInUse = Math.min(Number(form.quantityInUse), quantity);
     if (!itemName || quantity < 1) return;
 
     const existing = items.find(i =>
@@ -221,7 +336,7 @@ export default function DepartmentInventory() {
     if (existing) {
       const { data, error } = await supabase
         .from('items')
-        .update({ quantity: existing.quantity + quantity, quantity_in_use: existing.quantityInUse + quantityInUse })
+        .update({ quantity: existing.quantity + quantity })
         .eq('id', existing.id).select().single();
       if (!error && data) {
         const updated = toInventoryItem(data as ItemRow);
@@ -231,7 +346,7 @@ export default function DepartmentInventory() {
     } else {
       const { data, error } = await supabase
         .from('items')
-        .insert({ name: itemName, category: form.category, quantity, quantity_in_use: quantityInUse })
+        .insert({ name: itemName, category: form.category, quantity, quantity_in_use: 0 })
         .select().single();
       if (!error && data) {
         const newItem = toInventoryItem(data as ItemRow);
@@ -278,56 +393,38 @@ export default function DepartmentInventory() {
     setRemovingItemId(null);
   };
 
-  const clearInUseDraft = (id: number) =>
-    setInUseDrafts(prev => { const n = { ...prev }; delete n[id]; return n; });
+  const renderMyUsageControls = (item: InventoryItem): ReactNode => {
+    const current = myUsage[item.id] ?? 0;
+    const othersInUse = item.quantityInUse - current;
+    const maxAllowed = item.quantity - othersInUse;
 
-  const saveInUse = async (item: InventoryItem, value: string | number) => {
-    const parsed = value === '' ? 0 : Number(value);
-    if (!isFinite(parsed)) return;
-    const newVal = Math.min(Math.max(parsed, 0), item.quantity);
-    const diff = newVal - item.quantityInUse;
-    if (diff === 0) return;
-    const { data, error } = await supabase
-      .from('items')
-      .update({ quantity_in_use: newVal })
-      .eq('id', item.id).select().single();
-    if (!error && data) {
-      const updated = toInventoryItem(data as ItemRow);
-      setItems(prev => prev.map(i => i.id === item.id ? updated : i));
-      await logHistory(updated, diff > 0 ? 'Marked in use' : 'Returned from use', Math.abs(diff));
-      clearInUseDraft(item.id);
-    }
+    return (
+      <div className="stepper">
+        <button
+          className="stepper-button"
+          type="button"
+          disabled={current <= 0}
+          onClick={() => adjustMyUsage(item, -1)}
+        >-</button>
+        <input
+          className="stepper-input"
+          type="number"
+          min="0"
+          max={maxAllowed}
+          value={myUsageDrafts[item.id] ?? current}
+          onChange={e => handleMyUsageDraftChange(item, e.target.value)}
+          onBlur={e => handleMyUsageBlur(item, e.target.value)}
+          onKeyDown={e => handleMyUsageKeyDown(e, item)}
+        />
+        <button
+          className="stepper-button"
+          type="button"
+          disabled={current >= maxAllowed}
+          onClick={() => adjustMyUsage(item, 1)}
+        >+</button>
+      </div>
+    );
   };
-
-  const adjustInUse = async (item: InventoryItem, dir: number) => {
-    clearInUseDraft(item.id);
-    await saveInUse(item, item.quantityInUse + dir);
-  };
-
-  const handleInUseDraftChange = (item: InventoryItem, value: string) => {
-    if (value !== '' && !Number.isFinite(Number(value))) return;
-    setInUseDrafts(prev => ({ ...prev, [item.id]: value }));
-  };
-
-  const handleInUseKeyDown = (e: KeyboardEvent<HTMLInputElement>, item: InventoryItem) => {
-    if (e.key === 'Enter') { e.currentTarget.blur(); return; }
-    if (e.key === 'Escape') clearInUseDraft(item.id);
-  };
-
-  const renderInUseControls = (item: InventoryItem): ReactNode => (
-    <div className="stepper">
-      <button className="stepper-button" type="button" disabled={item.quantityInUse <= 0} onClick={() => adjustInUse(item, -1)}>-</button>
-      <input
-        className="stepper-input"
-        type="number" min="0" max={item.quantity}
-        value={inUseDrafts[item.id] ?? item.quantityInUse}
-        onChange={e => handleInUseDraftChange(item, e.target.value)}
-        onBlur={e => saveInUse(item, e.target.value)}
-        onKeyDown={e => handleInUseKeyDown(e, item)}
-      />
-      <button className="stepper-button" type="button" disabled={item.quantityInUse >= item.quantity} onClick={() => adjustInUse(item, 1)}>+</button>
-    </div>
-  );
 
   const renderRemoveControls = (item: InventoryItem): ReactNode => (
     <div className="remove-confirm">
@@ -350,12 +447,10 @@ export default function DepartmentInventory() {
     if (removingItemId === item.id) return renderRemoveControls(item);
     return (
       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-        {item.quantity > 0 && (
-          <button className="table-action" type="button" onClick={() => startRemoving(item.id)}>Remove</button>
-        )}
-        {item.quantity <= 0 && (
-          <span className="table-action-status">No stock</span>
-        )}
+        {item.quantity > 0
+          ? <button className="table-action" type="button" onClick={() => startRemoving(item.id)}>Remove</button>
+          : <span className="table-action-status">No stock</span>
+        }
         <button className="table-action table-action--history" type="button" onClick={() => openHistory(item)}>History</button>
       </div>
     );
@@ -370,7 +465,6 @@ export default function DepartmentInventory() {
   return (
     <main className="page-shell">
 
-      {/* History modal */}
       {historyItem && (
         <div className="history-overlay" onClick={closeHistory}>
           <div className="history-modal" onClick={e => e.stopPropagation()}>
@@ -379,7 +473,7 @@ export default function DepartmentInventory() {
                 <p className="eyebrow">History</p>
                 <h2>{historyItem.name}</h2>
               </div>
-              <button className="history-close" onClick={closeHistory}>✕</button>
+              <button className="history-close" type="button" onClick={closeHistory}>✕</button>
             </div>
             <div className="history-modal__body">
               {historyLoading ? (
@@ -399,7 +493,7 @@ export default function DepartmentInventory() {
                   <tbody>
                     {history.map(row => (
                       <tr key={row.id}>
-                        <td>{row.user_email}</td>
+                        <td>{formatUserEmail(row.user_email)}</td>
                         <td>
                           <span className={`history-action history-action--${
                             row.action === 'Removed quantity' || row.action === 'Returned from use' ? 'out' :
@@ -512,15 +606,6 @@ export default function DepartmentInventory() {
               </div>
             </label>
 
-            <label>
-              In Use
-              <div className="stepper">
-                <button className="stepper-button" type="button" disabled={Number(form.quantityInUse) <= 0} onClick={() => adjustFormField('quantityInUse', -1, 0, Number(form.quantity))}>-</button>
-                <input className="stepper-input" type="number" min="0" name="quantityInUse" value={form.quantityInUse} onChange={handleFieldChange} />
-                <button className="stepper-button" type="button" disabled={Number(form.quantityInUse) >= Number(form.quantity)} onClick={() => adjustFormField('quantityInUse', 1, 0, Number(form.quantity))}>+</button>
-              </div>
-            </label>
-
             <button className="button button--primary" type="submit">
               {matchingItem ? 'Add Quantity' : 'Save Item'}
             </button>
@@ -541,7 +626,8 @@ export default function DepartmentInventory() {
                 <th>Name</th>
                 <th>Category</th>
                 <th>Quantity</th>
-                <th>In Use</th>
+                <th>Total In Use</th>
+                <th>My In Use</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -552,12 +638,15 @@ export default function DepartmentInventory() {
                   <td className="item-name">{item.name}</td>
                   <td>{item.category}</td>
                   <td>{item.quantity}</td>
-                  <td>{renderInUseControls(item)}</td>
+                  <td>
+                    <span className="total-in-use">{item.quantityInUse}</span>
+                  </td>
+                  <td>{renderMyUsageControls(item)}</td>
                   <td><StatusBadge item={item} /></td>
                   <td>{renderActions(item)}</td>
                 </tr>
               )) : (
-                <tr><td className="empty-state" colSpan={6}>No items to show.</td></tr>
+                <tr><td className="empty-state" colSpan={7}>No items to show.</td></tr>
               )}
             </tbody>
           </table>
@@ -581,8 +670,12 @@ export default function DepartmentInventory() {
                 <span>{item.quantity}</span>
               </div>
               <div className="inventory-card__row">
-                <span className="eyebrow">In Use</span>
-                {renderInUseControls(item)}
+                <span className="eyebrow">Total In Use</span>
+                <span className="total-in-use">{item.quantityInUse}</span>
+              </div>
+              <div className="inventory-card__row">
+                <span className="eyebrow">My In Use</span>
+                {renderMyUsageControls(item)}
               </div>
             </div>
             <div className="inventory-card__footer" style={{ display: 'flex', gap: '6px' }}>
