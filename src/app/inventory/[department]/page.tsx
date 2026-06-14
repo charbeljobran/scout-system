@@ -1,6 +1,6 @@
 'use client';
 
-import type { FormEvent, KeyboardEvent, ReactNode } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import StatusBadge from '@/components/StatusBadge';
 import {
@@ -48,6 +48,9 @@ type InventoryForm = {
 
 type AmountDrafts = Record<number, number | ''>;
 type MyUsageDrafts = Record<number, number | string>;
+type UserRole = 'cg' | 'intendant' | 'gerant' | 'viewer';
+
+const PRIVILEGED_ROLES: UserRole[] = ['cg', 'intendant', 'gerant'];
 
 const categoryOptionsByDepartment: Record<InventoryDepartment, InventoryCategory[]> = {
   intendant: ['Cooking'],
@@ -98,6 +101,7 @@ export default function DepartmentInventory() {
 
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
@@ -109,15 +113,27 @@ export default function DepartmentInventory() {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const [userRole, setUserRole] = useState<UserRole>('viewer');
   const [myUsage, setMyUsage] = useState<Record<number, number>>({});
   const [myUsageDrafts, setMyUsageDrafts] = useState<MyUsageDrafts>({});
+  const [pendingUsage, setPendingUsage] = useState<Record<number, number>>({});
+
+  const isPrivileged = PRIVILEGED_ROLES.includes(userRole);
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
         const { data: userData } = await supabase.auth.getUser();
         const email = userData.user?.email ?? '';
+        const userId = userData.user?.id ?? '';
         setUserEmail(email);
+
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('id', userId)
+          .single();
+        setUserRole((roleData?.role as UserRole) ?? 'viewer');
 
         const { data: itemData, error: itemError } = await supabase
           .from('items')
@@ -148,6 +164,46 @@ export default function DepartmentInventory() {
     };
 
     fetchAll();
+
+    // Realtime subscription
+    const channel = supabase
+      .channel(`items-${dept}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'items',
+        },
+        (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as ItemRow;
+            if (categories.includes(updated.category as InventoryCategory)) {
+              setItems(prev => prev.map(i =>
+                i.id === updated.id ? toInventoryItem(updated) : i
+              ));
+            }
+          }
+          if (payload.eventType === 'INSERT') {
+            const inserted = payload.new as ItemRow;
+            if (categories.includes(inserted.category as InventoryCategory)) {
+              setItems(prev => {
+                if (prev.some(i => i.id === inserted.id)) return prev;
+                return [toInventoryItem(inserted), ...prev];
+              });
+            }
+          }
+          if (payload.eventType === 'DELETE') {
+            const deleted = payload.old as ItemRow;
+            setItems(prev => prev.filter(i => i.id !== deleted.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [dept]);
 
   const logHistory = async (item: InventoryItem, action: string, quantityChanged: number) => {
@@ -200,25 +256,71 @@ export default function DepartmentInventory() {
 
   const closeHistory = () => { setHistoryItem(null); setHistory([]); };
 
-  const saveMyUsage = async (item: InventoryItem, newMyQty: number) => {
+  const handleDeleteItem = async (item: InventoryItem) => {
+    if (!confirm(`Delete "${item.name}" completely? This cannot be undone.`)) return;
+    const { error } = await supabase.from('items').delete().eq('id', item.id);
+    if (!error) {
+      setItems(prev => prev.filter(i => i.id !== item.id));
+      await supabase.from('item_usage').delete().eq('item_id', item.id);
+      await supabase.from('history').delete().eq('item_id', item.id);
+    } else {
+      setError('Could not delete item.');
+    }
+  };
+
+  const handleMyUsageDraftChange = (item: InventoryItem, value: string) => {
+    if (value !== '' && !Number.isFinite(Number(value))) return;
+    setMyUsageDrafts(prev => ({ ...prev, [item.id]: value }));
+    const parsed = value === '' ? 0 : Number(value);
+    if (isFinite(parsed)) {
+      const current = myUsage[item.id] ?? 0;
+      const othersInUse = item.quantityInUse - current;
+      const maxAllowed = item.quantity - othersInUse;
+      const clamped = Math.min(Math.max(parsed, 0), maxAllowed);
+      setPendingUsage(prev => ({ ...prev, [item.id]: clamped }));
+    }
+  };
+
+  const adjustMyUsageDraft = (item: InventoryItem, dir: number) => {
+    const current = myUsage[item.id] ?? 0;
+    const othersInUse = item.quantityInUse - current;
+    const maxAllowed = item.quantity - othersInUse;
+    const currentDraft = pendingUsage[item.id] ?? current;
+    const newVal = Math.min(Math.max(currentDraft + dir, 0), maxAllowed);
+    setPendingUsage(prev => ({ ...prev, [item.id]: newVal }));
+    setMyUsageDrafts(prev => ({ ...prev, [item.id]: newVal }));
+  };
+
+  const confirmMyUsage = async (item: InventoryItem) => {
+    const newMyQty = pendingUsage[item.id];
+    if (newMyQty === undefined) return;
+
     const oldMyQty = myUsage[item.id] ?? 0;
     const diff = newMyQty - oldMyQty;
-    if (diff === 0) return;
+
+    if (diff === 0) {
+      setPendingUsage(prev => { const n = { ...prev }; delete n[item.id]; return n; });
+      setMyUsageDrafts(prev => { const n = { ...prev }; delete n[item.id]; return n; });
+      return;
+    }
 
     const othersInUse = item.quantityInUse - oldMyQty;
     const newTotal = othersInUse + newMyQty;
     if (newTotal > item.quantity) return;
 
+    const newQuantity = item.quantity - newMyQty;
+    const newQuantityInUse = othersInUse;
+
     await supabase.from('item_usage').upsert({
       item_id: item.id,
       user_email: userEmail,
-      quantity_in_use: newMyQty,
+      quantity_in_use: 0,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'item_id,user_email' });
 
     const { data } = await supabase
       .from('items')
-      .update({ quantity_in_use: newTotal })
+      .update({ quantity: newQuantity, quantity_in_use: newQuantityInUse })
       .eq('id', item.id)
       .select()
       .single();
@@ -227,50 +329,29 @@ export default function DepartmentInventory() {
       setItems(prev => prev.map(i => i.id === item.id ? toInventoryItem(data as ItemRow) : i));
     }
 
-    setMyUsage(prev => ({ ...prev, [item.id]: newMyQty }));
-    clearMyUsageDraft(item.id);
-    await logHistory(item, diff > 0 ? 'Marked in use' : 'Returned from use', Math.abs(diff));
+    setMyUsage(prev => ({ ...prev, [item.id]: 0 }));
+    setPendingUsage(prev => { const n = { ...prev }; delete n[item.id]; return n; });
+    setMyUsageDrafts(prev => { const n = { ...prev }; delete n[item.id]; return n; });
+    await logHistory(item, 'Checked out', newMyQty);
   };
 
-  const adjustMyUsage = async (item: InventoryItem, dir: number) => {
-    const current = myUsage[item.id] ?? 0;
-    const othersInUse = item.quantityInUse - current;
-    const maxAllowed = item.quantity - othersInUse;
-    const newVal = Math.min(Math.max(current + dir, 0), maxAllowed);
-    clearMyUsageDraft(item.id);
-    await saveMyUsage(item, newVal);
+  const cancelMyUsage = (item: InventoryItem) => {
+    setPendingUsage(prev => { const n = { ...prev }; delete n[item.id]; return n; });
+    setMyUsageDrafts(prev => { const n = { ...prev }; delete n[item.id]; return n; });
   };
 
-  const clearMyUsageDraft = (id: number) =>
-    setMyUsageDrafts(prev => { const n = { ...prev }; delete n[id]; return n; });
-
-  const handleMyUsageDraftChange = (item: InventoryItem, value: string) => {
-    if (value !== '' && !Number.isFinite(Number(value))) return;
-    setMyUsageDrafts(prev => ({ ...prev, [item.id]: value }));
-  };
-
-  const handleMyUsageBlur = (item: InventoryItem, value: string) => {
-    const parsed = value === '' ? 0 : Number(value);
-    if (!isFinite(parsed)) return;
-    const current = myUsage[item.id] ?? 0;
-    const othersInUse = item.quantityInUse - current;
-    const maxAllowed = item.quantity - othersInUse;
-    const clamped = Math.min(Math.max(parsed, 0), maxAllowed);
-    saveMyUsage(item, clamped);
-  };
-
-  const handleMyUsageKeyDown = (e: KeyboardEvent<HTMLInputElement>, item: InventoryItem) => {
-    if (e.key === 'Enter') { e.currentTarget.blur(); return; }
-    if (e.key === 'Escape') clearMyUsageDraft(item.id);
-  };
+  const hasPendingUsage = (item: InventoryItem) =>
+    pendingUsage[item.id] !== undefined &&
+    pendingUsage[item.id] !== (myUsage[item.id] ?? 0);
 
   const filteredItems = useMemo(() =>
     items.filter(item => {
       const matchCat = filterCategory ? item.category === filterCategory : true;
       const matchSearch = search ? item.name.toLowerCase().includes(search.toLowerCase()) : true;
-      return matchCat && matchSearch;
+      const matchStatus = filterStatus ? getStatus(item) === filterStatus : true;
+      return matchCat && matchSearch && matchStatus;
     }),
-    [items, filterCategory, search],
+    [items, filterCategory, search, filterStatus],
   );
 
   const itemSuggestions = useMemo(
@@ -397,31 +478,49 @@ export default function DepartmentInventory() {
     const current = myUsage[item.id] ?? 0;
     const othersInUse = item.quantityInUse - current;
     const maxAllowed = item.quantity - othersInUse;
+    const displayVal = myUsageDrafts[item.id] ?? current;
+    const isPending = hasPendingUsage(item);
 
     return (
-      <div className="stepper">
-        <button
-          className="stepper-button"
-          type="button"
-          disabled={current <= 0}
-          onClick={() => adjustMyUsage(item, -1)}
-        >-</button>
-        <input
-          className="stepper-input"
-          type="number"
-          min="0"
-          max={maxAllowed}
-          value={myUsageDrafts[item.id] ?? current}
-          onChange={e => handleMyUsageDraftChange(item, e.target.value)}
-          onBlur={e => handleMyUsageBlur(item, e.target.value)}
-          onKeyDown={e => handleMyUsageKeyDown(e, item)}
-        />
-        <button
-          className="stepper-button"
-          type="button"
-          disabled={current >= maxAllowed}
-          onClick={() => adjustMyUsage(item, 1)}
-        >+</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        <div className="stepper">
+          <button
+            className="stepper-button"
+            type="button"
+            disabled={(pendingUsage[item.id] ?? current) <= 0}
+            onClick={() => adjustMyUsageDraft(item, -1)}
+          >-</button>
+          <input
+            className="stepper-input"
+            type="number"
+            min="0"
+            max={maxAllowed}
+            value={displayVal}
+            onChange={e => handleMyUsageDraftChange(item, e.target.value)}
+          />
+          <button
+            className="stepper-button"
+            type="button"
+            disabled={(pendingUsage[item.id] ?? current) >= maxAllowed}
+            onClick={() => adjustMyUsageDraft(item, 1)}
+          >+</button>
+        </div>
+        {isPending && (
+          <>
+            <button
+              className="table-action"
+              type="button"
+              onClick={() => confirmMyUsage(item)}
+              style={{ fontSize: '12px', padding: '4px 8px' }}
+            >Done</button>
+            <button
+              className="table-action table-action--muted"
+              type="button"
+              onClick={() => cancelMyUsage(item)}
+              style={{ fontSize: '12px', padding: '4px 8px' }}
+            >Cancel</button>
+          </>
+        )}
       </div>
     );
   };
@@ -446,12 +545,19 @@ export default function DepartmentInventory() {
   const renderActions = (item: InventoryItem): ReactNode => {
     if (removingItemId === item.id) return renderRemoveControls(item);
     return (
-      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-        {item.quantity > 0
-          ? <button className="table-action" type="button" onClick={() => startRemoving(item.id)}>Remove</button>
-          : <span className="table-action-status">No stock</span>
-        }
-        <button className="table-action table-action--history" type="button" onClick={() => openHistory(item)}>History</button>
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {isPrivileged && item.quantity > 0 && (
+          <button className="table-action" type="button" onClick={() => startRemoving(item.id)}>Remove</button>
+        )}
+        {item.quantity <= 0 && (
+          <span className="table-action-status">No stock</span>
+        )}
+        {isPrivileged && (
+          <>
+            <button className="table-action table-action--history" type="button" onClick={() => openHistory(item)}>History</button>
+            <button className="table-action table-action--delete" type="button" onClick={() => handleDeleteItem(item)}>Delete</button>
+          </>
+        )}
       </div>
     );
   };
@@ -496,7 +602,7 @@ export default function DepartmentInventory() {
                         <td>{formatUserEmail(row.user_email)}</td>
                         <td>
                           <span className={`history-action history-action--${
-                            row.action === 'Removed quantity' || row.action === 'Returned from use' ? 'out' :
+                            row.action === 'Removed quantity' || row.action === 'Returned from use' || row.action === 'Checked out' ? 'out' :
                             row.action === 'Marked in use' ? 'use' : 'in'
                           }`}>
                             {row.action}
@@ -530,6 +636,12 @@ export default function DepartmentInventory() {
               {categoryOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           )}
+          <select className="select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+            <option value="">All Status</option>
+            <option value="Available">Available</option>
+            <option value="Low Stock">Low Stock</option>
+            <option value="Out of Stock">Out of Stock</option>
+          </select>
           <button className="button button--primary" type="button" onClick={() => setIsAdding(v => !v)}>
             {isAdding ? 'Close' : 'Add Item'}
           </button>
@@ -626,7 +738,6 @@ export default function DepartmentInventory() {
                 <th>Name</th>
                 <th>Category</th>
                 <th>Quantity</th>
-                <th>Total In Use</th>
                 <th>My In Use</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -638,15 +749,12 @@ export default function DepartmentInventory() {
                   <td className="item-name">{item.name}</td>
                   <td>{item.category}</td>
                   <td>{item.quantity}</td>
-                  <td>
-                    <span className="total-in-use">{item.quantityInUse}</span>
-                  </td>
                   <td>{renderMyUsageControls(item)}</td>
                   <td><StatusBadge item={item} /></td>
                   <td>{renderActions(item)}</td>
                 </tr>
               )) : (
-                <tr><td className="empty-state" colSpan={7}>No items to show.</td></tr>
+                <tr><td className="empty-state" colSpan={6}>No items to show.</td></tr>
               )}
             </tbody>
           </table>
@@ -670,15 +778,11 @@ export default function DepartmentInventory() {
                 <span>{item.quantity}</span>
               </div>
               <div className="inventory-card__row">
-                <span className="eyebrow">Total In Use</span>
-                <span className="total-in-use">{item.quantityInUse}</span>
-              </div>
-              <div className="inventory-card__row">
                 <span className="eyebrow">My In Use</span>
                 {renderMyUsageControls(item)}
               </div>
             </div>
-            <div className="inventory-card__footer" style={{ display: 'flex', gap: '6px' }}>
+            <div className="inventory-card__footer" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {renderActions(item)}
             </div>
           </article>

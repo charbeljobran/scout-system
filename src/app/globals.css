@@ -808,3 +808,6 @@ th { color: #ffffff; }
 }
 
 .table-action--history:hover { background: #f0ece8; }
+.table-panel table {
+  min-width: 100%;
+}

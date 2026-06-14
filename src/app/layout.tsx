@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Footer from '@/components/Footer';
 import Navbar from '@/components/Navbar';
+import ActivityTracker from '@/components/ActivityTracker';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <div className="app">
+          <ActivityTracker />
           <Navbar />
           <div className="app__content">{children}</div>
           <Footer />
