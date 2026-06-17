@@ -29,7 +29,7 @@ export default function Home() {
       <div className="landing-header">
         <img src="/sdlmwm-logo.jpg" alt="Scout Du Liban" width="72" height="72" />
         <h1>Scout Inventory</h1>
-        <p>Scout Du Liban-MW — Select a section to get started</p>
+        <p>Select a section to get started</p>
       </div>
 
       <div className="landing-grid">

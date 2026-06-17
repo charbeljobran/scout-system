@@ -9,13 +9,6 @@ type UserEntry = {
   role: string;
 };
 
-const roleLabels: Record<string, string> = {
-  cg: 'CG',
-  intendant: 'Intendant',
-  gerant: 'Gérant de Matériel',
-  viewer: 'Viewer',
-};
-
 export default function AdminPage() {
   const [users, setUsers] = useState<UserEntry[]>([]);
   const [ready, setReady] = useState(false);
@@ -101,33 +94,19 @@ export default function AdminPage() {
             <thead style={{ background: '#cc2222' }}>
               <tr>
                 <th style={{ padding: '10px 16px', textAlign: 'left', color: '#ffffff', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</th>
-                <th style={{ padding: '10px 16px', textAlign: 'left', color: '#ffffff', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Role</th>
                 <th style={{ padding: '10px 16px', textAlign: 'left', color: '#ffffff', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={3} style={{ textAlign: 'center', padding: '40px', color: '#76716c', fontStyle: 'italic' }}>
+                  <td colSpan={2} style={{ textAlign: 'center', padding: '40px', color: '#76716c', fontStyle: 'italic' }}>
                     No users found.
                   </td>
                 </tr>
               ) : users.map((user, index) => (
                 <tr key={user.id} style={{ borderTop: index === 0 ? 'none' : '1px solid #f0ece8' }}>
                   <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1a1a1a' }}>{user.email}</td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '2px 10px',
-                      borderRadius: '20px',
-                      fontSize: '11px',
-                      fontWeight: '700',
-                      background: '#f0ece8',
-                      color: '#4a4540',
-                    }}>
-                      {roleLabels[user.role] ?? user.role}
-                    </span>
-                  </td>
                   <td style={{ padding: '12px 16px' }}>
                     {resettingId === user.id ? (
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>

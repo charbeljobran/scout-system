@@ -165,16 +165,11 @@ export default function DepartmentInventory() {
 
     fetchAll();
 
-    // Realtime subscription
     const channel = supabase
       .channel(`items-${dept}`)
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'items',
-        },
+        { event: '*', schema: 'public', table: 'items' },
         (payload) => {
           if (payload.eventType === 'UPDATE') {
             const updated = payload.new as ItemRow;
@@ -201,9 +196,7 @@ export default function DepartmentInventory() {
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [dept]);
 
   const logHistory = async (item: InventoryItem, action: string, quantityChanged: number) => {
@@ -407,7 +400,7 @@ export default function DepartmentInventory() {
     e.preventDefault();
     const itemName = form.name.trim();
     const quantity = Number(form.quantity);
-    if (!itemName || quantity < 1) return;
+    if (!itemName || quantity <= 0) return;
 
     const existing = items.find(i =>
       i.name.toLowerCase() === itemName.toLowerCase() &&
@@ -449,13 +442,13 @@ export default function DepartmentInventory() {
   const adjustRemove = (item: InventoryItem, dir: number) => {
     setRemoveAmounts(prev => ({
       ...prev,
-      [item.id]: Math.min(Math.max(Number(prev[item.id] || 1) + dir, 1), item.quantity),
+      [item.id]: Math.min(Math.max(Number(prev[item.id] || 1) + dir, 0.01), item.quantity),
     }));
   };
 
   const getRemoveAmt = (item: InventoryItem) => {
     const n = Number(removeAmounts[item.id] || 1);
-    return Math.min(isFinite(n) && n >= 1 ? n : 1, Math.max(item.quantity, 1));
+    return Math.min(isFinite(n) && n > 0 ? n : 1, Math.max(item.quantity, 0.01));
   };
 
   const handleRemove = async (item: InventoryItem) => {
@@ -494,6 +487,7 @@ export default function DepartmentInventory() {
             className="stepper-input"
             type="number"
             min="0"
+            step="0.01"
             max={maxAllowed}
             value={displayVal}
             onChange={e => handleMyUsageDraftChange(item, e.target.value)}
@@ -528,10 +522,13 @@ export default function DepartmentInventory() {
   const renderRemoveControls = (item: InventoryItem): ReactNode => (
     <div className="remove-confirm">
       <div className="stepper">
-        <button className="stepper-button" type="button" disabled={getRemoveAmt(item) <= 1} onClick={() => adjustRemove(item, -1)}>-</button>
+        <button className="stepper-button" type="button" disabled={getRemoveAmt(item) <= 0.01} onClick={() => adjustRemove(item, -1)}>-</button>
         <input
           className="stepper-input"
-          type="number" min="1" max={item.quantity}
+          type="number"
+          min="0.01"
+          step="0.01"
+          max={item.quantity}
           value={removeAmounts[item.id] ?? 1}
           onChange={e => setRemoveAmounts(prev => ({ ...prev, [item.id]: Number(e.target.value) }))}
         />
@@ -712,9 +709,17 @@ export default function DepartmentInventory() {
             <label>
               Quantity
               <div className="stepper">
-                <button className="stepper-button" type="button" disabled={Number(form.quantity) <= 1} onClick={() => adjustFormField('quantity', -1, 1, 9999)}>-</button>
-                <input className="stepper-input" type="number" min="1" name="quantity" value={form.quantity} onChange={handleFieldChange} />
-                <button className="stepper-button" type="button" onClick={() => adjustFormField('quantity', 1, 1, 9999)}>+</button>
+                <button className="stepper-button" type="button" disabled={Number(form.quantity) <= 0.01} onClick={() => adjustFormField('quantity', -1, 0.01, 9999)}>-</button>
+                <input
+                  className="stepper-input"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  name="quantity"
+                  value={form.quantity}
+                  onChange={handleFieldChange}
+                />
+                <button className="stepper-button" type="button" onClick={() => adjustFormField('quantity', 1, 0.01, 9999)}>+</button>
               </div>
             </label>
 
