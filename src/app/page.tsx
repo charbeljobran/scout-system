@@ -1,4 +1,8 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 type Feature = {
   href: string;
@@ -11,7 +15,6 @@ const features: Feature[] = [
   {
     href: '/inventory/intendant',
     title: 'Intendant',
-
     accent: 'accent-orange',
     emoji: '🍳',
   },
@@ -24,6 +27,23 @@ const features: Feature[] = [
 ];
 
 export default function Home() {
+  const [isCG, setIsCG] = useState(false);
+
+  useEffect(() => {
+    const checkRole = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) return;
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+      setIsCG(data?.role === 'cg');
+    };
+    checkRole();
+  }, []);
+
   return (
     <main className="landing-shell">
       <div className="landing-header">
@@ -40,12 +60,17 @@ export default function Home() {
           </Link>
         ))}
 
-        {/* Contact — always last */}
         <Link href="/contact" className="landing-card panel accent-red landing-card--contact">
           <span className="landing-card__emoji">📬</span>
           <h2 className="landing-card__title">Contact</h2>
-          
         </Link>
+
+        {isCG && (
+          <Link href="/admin" className="landing-card panel accent-red landing-card--contact">
+            <span className="landing-card__emoji">⚙️</span>
+            <h2 className="landing-card__title">Admin</h2>
+          </Link>
+        )}
       </div>
     </main>
   );
