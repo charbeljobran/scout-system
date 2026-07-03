@@ -42,7 +42,6 @@ export async function middleware(req: NextRequest) {
 
     if (lastActivity) {
       const elapsed = now - parseInt(lastActivity)
-      console.log('Elapsed since last activity:', Math.round(elapsed / 1000), 'seconds')
       if (elapsed > INACTIVITY_TIMEOUT) {
         await supabase.auth.signOut()
         const redirectRes = NextResponse.redirect(new URL('/login', req.url))
@@ -51,8 +50,9 @@ export async function middleware(req: NextRequest) {
       }
     }
 
+    // ✅ httpOnly: true — JavaScript cannot read or tamper with this cookie
     res.cookies.set('last_activity', String(now), {
-      httpOnly: false,
+      httpOnly: true,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24,
