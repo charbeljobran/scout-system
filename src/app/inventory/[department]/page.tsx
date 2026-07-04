@@ -112,6 +112,10 @@ export default function DepartmentInventory() {
   const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [showActivityLog, setShowActivityLog] = useState(false);
+  const [activityLog, setActivityLog] = useState<HistoryRow[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityUserFilter, setActivityUserFilter] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [userRole, setUserRole] = useState<UserRole>('viewer');
   const [myUsage, setMyUsage] = useState<Record<number, number>>({});
@@ -251,6 +255,25 @@ export default function DepartmentInventory() {
 
   const closeHistory = () => { setHistoryItem(null); setHistory([]); };
 
+  const openActivityLog = async () => {
+    setShowActivityLog(true);
+    setActivityLoading(true);
+    const { data } = await supabase
+      .from('history')
+      .select('*')
+      .in('category', categories)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    setActivityLog((data as HistoryRow[]) ?? []);
+    setActivityLoading(false);
+  };
+
+  const closeActivityLog = () => {
+    setShowActivityLog(false);
+    setActivityLog([]);
+    setActivityUserFilter('');
+  };
+
   const handleDeleteItem = async (item: InventoryItem) => {
     if (!confirm(`Delete "${item.name}" completely? This cannot be undone.`)) return;
     const { error } = await supabase.from('items').delete().eq('id', item.id);
@@ -347,6 +370,16 @@ export default function DepartmentInventory() {
       return matchCat && matchSearch && matchStatus;
     }),
     [items, filterCategory, search, filterStatus],
+  );
+
+  const activityUsers = useMemo(
+    () => [...new Set(activityLog.map(row => row.user_email))].sort((a, b) => a.localeCompare(b)),
+    [activityLog],
+  );
+
+  const filteredActivityLog = useMemo(
+    () => activityUserFilter ? activityLog.filter(row => row.user_email === activityUserFilter) : activityLog,
+    [activityLog, activityUserFilter],
   );
 
   const itemSuggestions = useMemo(
@@ -619,6 +652,75 @@ export default function DepartmentInventory() {
         </div>
       )}
 
+      {showActivityLog && (
+        <div className="history-overlay" onClick={closeActivityLog}>
+          <div className="history-modal history-modal--wide" onClick={e => e.stopPropagation()}>
+            <div className="history-modal__header">
+              <div>
+                <p className="eyebrow">Activity Log</p>
+                <h2>{label}</h2>
+              </div>
+              <button className="history-close" type="button" onClick={closeActivityLog}>✕</button>
+            </div>
+            <div className="activity-filter-row">
+              <label className="activity-filter-label">
+                Filter by user
+                <select
+                  className="select"
+                  value={activityUserFilter}
+                  onChange={e => setActivityUserFilter(e.target.value)}
+                >
+                  <option value="">All Users</option>
+                  {activityUsers.map(email => (
+                    <option key={email} value={email}>{formatUserEmail(email)}</option>
+                  ))}
+                </select>
+              </label>
+              <span className="activity-count">
+                {filteredActivityLog.length} {filteredActivityLog.length === 1 ? 'entry' : 'entries'}
+              </span>
+            </div>
+            <div className="history-modal__body">
+              {activityLoading ? (
+                <p className="history-empty">Loading...</p>
+              ) : filteredActivityLog.length === 0 ? (
+                <p className="history-empty">No activity yet.</p>
+              ) : (
+                <table className="history-table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>User</th>
+                      <th>Action</th>
+                      <th>Qty</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredActivityLog.map(row => (
+                      <tr key={row.id}>
+                        <td>{row.item_name}</td>
+                        <td>{formatUserEmail(row.user_email)}</td>
+                        <td>
+                          <span className={`history-action history-action--${
+                            row.action === 'Removed quantity' || row.action === 'Returned from use' || row.action === 'Checked out' ? 'out' :
+                            row.action === 'Marked in use' ? 'use' : 'in'
+                          }`}>
+                            {row.action}
+                          </span>
+                        </td>
+                        <td><strong>{row.quantity_changed}</strong></td>
+                        <td>{formatDate(row.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="section-header section-header--wrap">
         <h1>{label}</h1>
         <div className="toolbar">
@@ -644,6 +746,11 @@ export default function DepartmentInventory() {
           <button className="button button--primary" type="button" onClick={() => setIsAdding(v => !v)}>
             {isAdding ? 'Close' : 'Add Item'}
           </button>
+          {isPrivileged && (
+            <button className="button button--secondary" type="button" onClick={openActivityLog}>
+             Activity Log
+            </button>
+          )}
         </div>
       </div>
 
