@@ -50,7 +50,6 @@ export async function middleware(req: NextRequest) {
       }
     }
 
-    // ✅ httpOnly: true — JavaScript cannot read or tamper with this cookie
     res.cookies.set('last_activity', String(now), {
       httpOnly: true,
       sameSite: 'lax',
@@ -63,5 +62,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/inventory/:path*', '/contact', '/login', '/admin'],
+  matcher: ['/', '/inventory/:path*', '/contact', '/about', '/login', '/admin'],
 }

@@ -28,31 +28,37 @@ execute function public.set_updated_at();
 
 alter table public.items enable row level security;
 
+-- Drop legacy anon-based policies if migrating from an earlier version
 drop policy if exists "Allow public inventory reads" on public.items;
-create policy "Allow public inventory reads"
+drop policy if exists "Allow public inventory inserts" on public.items;
+drop policy if exists "Allow public inventory updates" on public.items;
+drop policy if exists "Allow public inventory deletes" on public.items;
+
+drop policy if exists "Allow authenticated inventory reads" on public.items;
+create policy "Allow authenticated inventory reads"
 on public.items
 for select
-to anon
+to authenticated
 using (true);
 
-drop policy if exists "Allow public inventory inserts" on public.items;
-create policy "Allow public inventory inserts"
+drop policy if exists "Allow authenticated inventory inserts" on public.items;
+create policy "Allow authenticated inventory inserts"
 on public.items
 for insert
-to anon
+to authenticated
 with check (true);
 
-drop policy if exists "Allow public inventory updates" on public.items;
-create policy "Allow public inventory updates"
+drop policy if exists "Allow authenticated inventory updates" on public.items;
+create policy "Allow authenticated inventory updates"
 on public.items
 for update
-to anon
+to authenticated
 using (true)
 with check (true);
 
-drop policy if exists "Allow public inventory deletes" on public.items;
-create policy "Allow public inventory deletes"
+drop policy if exists "Allow authenticated inventory deletes" on public.items;
+create policy "Allow authenticated inventory deletes"
 on public.items
 for delete
-to anon
+to authenticated
 using (true);

@@ -11,20 +11,6 @@ export async function POST(req: NextRequest) {
   try {
     const { userId, password } = await req.json();
 
-    // Verify the requester's session from the Authorization header
-    const authHeader = req.headers.get('Authorization') ?? '';
-    const token = authHeader.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
-    }
-
-    const { data: { user: requester }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !requester) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
-    }
-
     if (!userId || !password) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
     }
@@ -33,11 +19,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Password must be at least 8 characters.' }, { status: 400 });
     }
 
-    // Verify the requester is a CG (server-side, using their real session)
+    // Identify the requester from their real session token, not a client-supplied id.
+    const authHeader = req.headers.get('authorization') ?? '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : '';
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+    }
+
+    const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !authData?.user) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+    }
+
+    const requesterId = authData.user.id;
+
+    // Verify the requester is a CG
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
-      .eq('id', requester.id)
+      .eq('id', requesterId)
       .single();
 
     if (roleError || roleData?.role !== 'cg') {

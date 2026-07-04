@@ -128,12 +128,14 @@ export default function DepartmentInventory() {
         const userId = userData.user?.id ?? '';
         setUserEmail(email);
 
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('id', userId)
-          .single();
-        setUserRole((roleData?.role as UserRole) ?? 'viewer');
+        if (userId) {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('id', userId)
+            .single();
+          setUserRole((roleData?.role as UserRole) ?? 'viewer');
+        }
 
         const { data: itemData, error: itemError } = await supabase
           .from('items')

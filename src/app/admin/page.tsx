@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 type UserEntry = {
@@ -10,6 +11,7 @@ type UserEntry = {
 };
 
 export default function AdminPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<UserEntry[]>([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
@@ -19,16 +21,41 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    supabase.rpc('get_all_users').then(({ data, error }) => {
+    const load = async () => {
+      // Second layer of defense: confirm the caller is actually a CG.
+      // Middleware only checks "logged in", not role, so this page must
+      // check for itself and bounce anyone who isn't authorized.
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+
+      if (!userId) {
+        router.replace('/login');
+        return;
+      }
+
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (roleError || roleData?.role !== 'cg') {
+        router.replace('/');
+        return;
+      }
+
+      const { data, error } = await supabase.rpc('get_all_users');
       if (error) setError('Could not load users.');
       else setUsers(data as UserEntry[]);
       setReady(true);
-    });
-  }, []);
+    };
+
+    load();
+  }, [router]);
 
   const handleResetPassword = async (user: UserEntry) => {
-    if (!newPassword || newPassword.length < 6) {
-      setError('Password must be at least 6 characters.');
+    if (!newPassword || newPassword.length < 8) {
+      setError('Password must be at least 8 characters.');
       return;
     }
 
@@ -36,14 +63,23 @@ export default function AdminPage() {
     setError('');
     setSuccess('');
 
-    const { data: userData } = await supabase.auth.getUser();
-    const requesterId = userData.user?.id;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+
+    if (!accessToken) {
+      setError('Your session has expired. Please log in again.');
+      setSaving(false);
+      return;
+    }
 
     try {
       const res = await fetch('/api/admin/reset-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, password: newPassword, requesterId }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ userId: user.id, password: newPassword }),
       });
 
       const result = await res.json();
