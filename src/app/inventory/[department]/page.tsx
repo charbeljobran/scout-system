@@ -84,6 +84,57 @@ const formatUserEmail = (email: string) => {
     .join(' ');
 };
 
+const skeletonWidth = (i: number, j: number) => `${55 + ((i + j) % 4) * 12}%`;
+
+const renderSkeletonTableRows = (rows: number, cols: number) => (
+  Array.from({ length: rows }).map((_, i) => (
+    <tr key={i} aria-hidden="true">
+      {Array.from({ length: cols }).map((_, j) => (
+        <td key={j}>
+          <span className="skeleton skeleton-text" style={{ width: skeletonWidth(i, j) }} />
+        </td>
+      ))}
+    </tr>
+  ))
+);
+
+const renderSkeletonInventoryCards = (count: number) => (
+  Array.from({ length: count }).map((_, i) => (
+    <article className="inventory-card panel accent-red" key={i} aria-hidden="true">
+      <div className="inventory-card__header">
+        <span className="skeleton skeleton-text" style={{ width: '45%' }} />
+        <span className="skeleton skeleton-pill" />
+      </div>
+      <div className="inventory-card__body">
+        <div className="inventory-card__row">
+          <span className="skeleton skeleton-text" style={{ width: '30%' }} />
+          <span className="skeleton skeleton-text" style={{ width: '20%' }} />
+        </div>
+        <div className="inventory-card__row">
+          <span className="skeleton skeleton-text" style={{ width: '30%' }} />
+          <span className="skeleton skeleton-text" style={{ width: '20%' }} />
+        </div>
+      </div>
+    </article>
+  ))
+);
+
+const renderSkeletonActivityCards = (count: number) => (
+  Array.from({ length: count }).map((_, i) => (
+    <article className="activity-card" key={i} aria-hidden="true">
+      <div className="activity-card__top">
+        <span className="skeleton skeleton-text" style={{ width: '40%' }} />
+        <span className="skeleton skeleton-pill" />
+      </div>
+      <div className="activity-card__row">
+        <span className="skeleton skeleton-text" style={{ width: '35%' }} />
+        <span className="skeleton skeleton-text" style={{ width: '15%' }} />
+      </div>
+      <span className="skeleton skeleton-text" style={{ width: '25%' }} />
+    </article>
+  ))
+);
+
 export default function DepartmentInventory() {
   const params = useParams<{ department: string }>();
   const dept = (params?.department ?? 'materiel') as InventoryDepartment;
@@ -605,7 +656,38 @@ export default function DepartmentInventory() {
 
   if (loading) return (
     <main className="page-shell">
-      <p style={{ textAlign: 'center', color: '#888', padding: '40px' }}>Loading inventory...</p>
+      <div className="section-header section-header--wrap">
+        <h1>{label}</h1>
+        <div className="toolbar">
+          <span className="skeleton skeleton-control" style={{ width: '200px' }} />
+          <span className="skeleton skeleton-control" style={{ width: '120px' }} />
+          <span className="skeleton skeleton-control" style={{ width: '110px' }} />
+        </div>
+      </div>
+
+      <section className="panel table-panel accent-red" aria-label="Inventory items loading">
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Quantity</th>
+                <th>My In Use</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {renderSkeletonTableRows(6, 6)}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mobile-cards" aria-label="Inventory items loading mobile">
+        {renderSkeletonInventoryCards(4)}
+      </section>
     </main>
   );
 
@@ -624,7 +706,19 @@ export default function DepartmentInventory() {
             </div>
             <div className="history-modal__body">
               {historyLoading ? (
-                <p className="history-empty">Loading...</p>
+                <table className="history-table">
+                  <thead>
+                    <tr>
+                      <th>User</th>
+                      <th>Action</th>
+                      <th>Qty</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {renderSkeletonTableRows(4, 4)}
+                  </tbody>
+                </table>
               ) : history.length === 0 ? (
                 <p className="history-empty">No history yet for this item.</p>
               ) : (
@@ -691,7 +785,27 @@ export default function DepartmentInventory() {
             </div>
             <div className="history-modal__body">
               {activityLoading ? (
-                <p className="history-empty">Loading...</p>
+                <>
+                  <div className="activity-table-wrap">
+                    <table className="history-table">
+                      <thead>
+                        <tr>
+                          <th>Item</th>
+                          <th>User</th>
+                          <th>Action</th>
+                          <th>Qty</th>
+                          <th>Date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {renderSkeletonTableRows(6, 5)}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="activity-cards">
+                    {renderSkeletonActivityCards(4)}
+                  </div>
+                </>
               ) : filteredActivityLog.length === 0 ? (
                 <p className="history-empty">No activity yet.</p>
               ) : (

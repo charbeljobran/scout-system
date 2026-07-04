@@ -907,3 +907,34 @@ th { color: #ffffff; }
   .activity-filter-label .select { min-width: 0; width: 100%; }
   .history-modal__body { padding: 12px 16px; }
 }
+
+/* ── SKELETON LOADING ── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+.skeleton {
+  display: inline-block;
+  background: linear-gradient(90deg, #ece7e1 25%, #f6f2ee 37%, #ece7e1 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+.skeleton-text {
+  height: 12px;
+  width: 100%;
+}
+
+.skeleton-pill {
+  height: 20px;
+  width: 64px;
+  border-radius: 20px;
+}
+
+.skeleton-control {
+  height: 32px;
+  border-radius: 8px;
+}
