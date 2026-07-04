@@ -1,200 +1,71 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import type { FormEvent } from 'react';
 
-type UserEntry = {
-  id: string;
-  email: string;
-  role: string;
-};
+const contactMethods = [
+  { label: 'Email', value: 'charbeljobran7@gmail.com' },
+  { label: 'Phone', value: '+961 81057117' },
 
-export default function AdminPage() {
-  const router = useRouter();
-  const [users, setUsers] = useState<UserEntry[]>([]);
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [resettingId, setResettingId] = useState<string | null>(null);
-  const [newPassword, setNewPassword] = useState('');
-  const [saving, setSaving] = useState(false);
+];
 
-  useEffect(() => {
-    const init = async () => {
-      // Client-side role check as a second layer of protection
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
-
-      if (!userId) {
-        router.replace('/login');
-        return;
-      }
-
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('id', userId)
-        .single();
-
-      if (roleData?.role !== 'cg') {
-        router.replace('/');
-        return;
-      }
-
-      supabase.rpc('get_all_users').then(({ data, error }) => {
-        if (error) setError('Could not load users.');
-        else setUsers(data as UserEntry[]);
-        setReady(true);
-      });
-    };
-
-    init();
-  }, [router]);
-
-  const handleResetPassword = async (user: UserEntry) => {
-    if (!newPassword || newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-
-    setSaving(true);
-    setError('');
-    setSuccess('');
-
-    // Get the session token to send in the Authorization header
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-
-    if (!token) {
-      setError('Session expired. Please log in again.');
-      setSaving(false);
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/admin/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ userId: user.id, password: newPassword }),
-      });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        setError(result.error ?? 'Could not reset password.');
-      } else {
-        setSuccess(`Password reset successfully for ${user.email}.`);
-        setResettingId(null);
-        setNewPassword('');
-      }
-    } catch {
-      setError('Network error — could not reach the server.');
-    } finally {
-      setSaving(false);
-    }
+export default function Contact() {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
   };
 
-  if (!ready) return (
-    <main className="page-shell">
-      <p style={{ textAlign: 'center', color: '#888', padding: '40px' }}>Loading...</p>
-    </main>
-  );
-
   return (
-    <main className="page-shell">
+    <main className="page-shell contact-page">
+      
+      
 
-      <div style={{ marginBottom: '24px' }}>
-        <p className="eyebrow">Admin</p>
-        <h1 style={{ fontSize: '24px', fontWeight: '800', marginTop: '4px' }}>User Management</h1>
-      </div>
+      <section className="contact-layout">
+        <aside className="contact-info-panel">
 
-      {error && (
-        <div style={{ background: '#fde8e8', border: '1px solid #f0c0c0', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
-          <p style={{ color: '#8b1a1a', fontSize: '13px', fontWeight: '600' }}>{error}</p>
-        </div>
-      )}
+          <div className="contact-methods">
+            {contactMethods.map((method) => (
+              <div className="contact-method" key={method.label}>
+                <span>{method.label}</span>
+                <strong>{method.value}</strong>
+              </div>
+            ))}
+          </div>
+        </aside>
 
-      {success && (
-        <div style={{ background: '#d4edda', border: '1px solid #b8ddc4', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
-          <p style={{ color: '#1a5c2a', fontSize: '13px', fontWeight: '600' }}>{success}</p>
-        </div>
-      )}
+        <section className="panel form-card contact-form-card accent-red" aria-label="Contact form">
+          <div className="form-card__header">
+            <h2>Send a Message</h2>
+            
+          </div>
 
-      <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e8e3de', borderTop: '4px solid #cc2222', overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead style={{ background: '#cc2222' }}>
-              <tr>
-                <th style={{ padding: '10px 16px', textAlign: 'left', color: '#ffffff', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</th>
-                <th style={{ padding: '10px 16px', textAlign: 'left', color: '#ffffff', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.length === 0 ? (
-                <tr>
-                  <td colSpan={2} style={{ textAlign: 'center', padding: '40px', color: '#76716c', fontStyle: 'italic' }}>
-                    No users found.
-                  </td>
-                </tr>
-              ) : users.map((user, index) => (
-                <tr key={user.id} style={{ borderTop: index === 0 ? 'none' : '1px solid #f0ece8' }}>
-                  <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1a1a1a' }}>{user.email}</td>
-                  <td style={{ padding: '12px 16px' }}>
-                    {resettingId === user.id ? (
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <input
-                          type="password"
-                          placeholder="New password (min 8 chars)"
-                          value={newPassword}
-                          onChange={e => setNewPassword(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') handleResetPassword(user); }}
-                          style={{
-                            padding: '5px 10px',
-                            border: '1px solid #d8d1ca',
-                            borderRadius: '6px',
-                            fontSize: '13px',
-                            width: '200px',
-                            background: '#f5f3f0',
-                            outline: 'none',
-                          }}
-                        />
-                        <button
-                          className="table-action"
-                          type="button"
-                          disabled={saving}
-                          onClick={() => handleResetPassword(user)}
-                        >
-                          {saving ? 'Saving...' : 'Confirm'}
-                        </button>
-                        <button
-                          className="table-action table-action--muted"
-                          type="button"
-                          onClick={() => { setResettingId(null); setNewPassword(''); setError(''); }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        className="table-action"
-                        type="button"
-                        onClick={() => { setResettingId(user.id); setNewPassword(''); setSuccess(''); setError(''); }}
-                      >
-                        Reset Password
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          <form onSubmit={handleSubmit}>
+            <div className="form-grid">
+              <label>
+                Full name
+                <input type="text" placeholder="Your full name" />
+              </label>
 
+              <label>
+                Email
+                <input type="email" placeholder="Your email address" />
+              </label>
+            </div>
+
+            <label>
+              Subject
+              <input type="text" placeholder="Subject of your message" />
+            </label>
+
+            <label>
+              Message
+              <textarea placeholder="Your message" rows={5} />
+            </label>
+
+            <button className="button button--primary" type="submit">
+              Send Message
+            </button>
+          </form>
+        </section>
+      </section>
     </main>
   );
 }
