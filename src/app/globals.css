@@ -753,6 +753,7 @@ th { color: #ffffff; }
 
 .history-modal__body {
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 16px 24px;
 }
 

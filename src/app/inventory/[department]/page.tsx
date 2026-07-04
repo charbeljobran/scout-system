@@ -255,6 +255,15 @@ export default function DepartmentInventory() {
 
   const closeHistory = () => { setHistoryItem(null); setHistory([]); };
 
+  const isAnyHistoryModalOpen = Boolean(historyItem) || showActivityLog;
+
+  useEffect(() => {
+    if (!isAnyHistoryModalOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [isAnyHistoryModalOpen]);
+
   const openActivityLog = async () => {
     setShowActivityLog(true);
     setActivityLoading(true);
@@ -773,7 +782,7 @@ export default function DepartmentInventory() {
           </button>
           {isPrivileged && (
             <button className="button button--secondary" type="button" onClick={openActivityLog}>
-              🕓 Activity Log
+             Activity Log
             </button>
           )}
         </div>
