@@ -686,35 +686,60 @@ export default function DepartmentInventory() {
               ) : filteredActivityLog.length === 0 ? (
                 <p className="history-empty">No activity yet.</p>
               ) : (
-                <table className="history-table">
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>User</th>
-                      <th>Action</th>
-                      <th>Qty</th>
-                      <th>Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <>
+                  <div className="activity-table-wrap">
+                    <table className="history-table">
+                      <thead>
+                        <tr>
+                          <th>Item</th>
+                          <th>User</th>
+                          <th>Action</th>
+                          <th>Qty</th>
+                          <th>Date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredActivityLog.map(row => (
+                          <tr key={row.id}>
+                            <td>{row.item_name}</td>
+                            <td>{formatUserEmail(row.user_email)}</td>
+                            <td>
+                              <span className={`history-action history-action--${
+                                row.action === 'Removed quantity' || row.action === 'Returned from use' || row.action === 'Checked out' ? 'out' :
+                                row.action === 'Marked in use' ? 'use' : 'in'
+                              }`}>
+                                {row.action}
+                              </span>
+                            </td>
+                            <td><strong>{row.quantity_changed}</strong></td>
+                            <td>{formatDate(row.created_at)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="activity-cards">
                     {filteredActivityLog.map(row => (
-                      <tr key={row.id}>
-                        <td>{row.item_name}</td>
-                        <td>{formatUserEmail(row.user_email)}</td>
-                        <td>
+                      <article className="activity-card" key={row.id}>
+                        <div className="activity-card__top">
+                          <span className="activity-card__item">{row.item_name}</span>
                           <span className={`history-action history-action--${
                             row.action === 'Removed quantity' || row.action === 'Returned from use' || row.action === 'Checked out' ? 'out' :
                             row.action === 'Marked in use' ? 'use' : 'in'
                           }`}>
                             {row.action}
                           </span>
-                        </td>
-                        <td><strong>{row.quantity_changed}</strong></td>
-                        <td>{formatDate(row.created_at)}</td>
-                      </tr>
+                        </div>
+                        <div className="activity-card__row">
+                          <span>{formatUserEmail(row.user_email)}</span>
+                          <span><strong>Qty {row.quantity_changed}</strong></span>
+                        </div>
+                        <div className="activity-card__date">{formatDate(row.created_at)}</div>
+                      </article>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -748,7 +773,7 @@ export default function DepartmentInventory() {
           </button>
           {isPrivileged && (
             <button className="button button--secondary" type="button" onClick={openActivityLog}>
-             Activity Log
+              🕓 Activity Log
             </button>
           )}
         </div>
