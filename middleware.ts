@@ -1,9 +1,22 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const INACTIVITY_TIMEOUT = 15 * 60 * 1000 // 15 minutes
 const MFA_SETUP_PATH = '/mfa/setup'
 const MFA_VERIFY_PATH = '/mfa/verify'
+const EMAIL_MFA_COOKIE = 'email_mfa_session'
+
+const hashMfaToken = async (token: string) => {
+  const secret =
+    process.env.EMAIL_MFA_SECRET ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    'local-email-mfa-secret'
+  const encoded = new TextEncoder().encode(`${token}:${secret}`)
+  const digest = await crypto.subtle.digest('SHA-256', encoded)
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+}
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: req })
@@ -40,10 +53,40 @@ export async function middleware(req: NextRequest) {
   }
 
   if (user && !isLoginPage) {
-    const { data: assurance } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
 
-    if (assurance?.currentLevel !== 'aal2') {
-      const target = assurance?.nextLevel === 'aal2' ? MFA_VERIFY_PATH : MFA_SETUP_PATH
+    const { data: mfaSetting } = await supabaseAdmin
+      .from('user_mfa_email_settings')
+      .select('verified_at')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    const hasEmailMfa = Boolean(mfaSetting?.verified_at)
+    let hasMfaSession = false
+
+    if (hasEmailMfa) {
+      const mfaToken = req.cookies.get(EMAIL_MFA_COOKIE)?.value
+
+      if (mfaToken) {
+        const tokenHash = await hashMfaToken(mfaToken)
+        const { data: mfaSession } = await supabaseAdmin
+          .from('user_mfa_email_sessions')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('token_hash', tokenHash)
+          .gt('expires_at', new Date().toISOString())
+          .maybeSingle()
+
+        hasMfaSession = Boolean(mfaSession)
+      }
+    }
+
+    if (!hasEmailMfa || !hasMfaSession) {
+      const target = hasEmailMfa ? MFA_VERIFY_PATH : MFA_SETUP_PATH
 
       if (req.nextUrl.pathname !== target) {
         return NextResponse.redirect(new URL(target, req.url))
@@ -61,6 +104,7 @@ export async function middleware(req: NextRequest) {
         await supabase.auth.signOut()
         const redirectRes = NextResponse.redirect(new URL('/login', req.url))
         redirectRes.cookies.delete('last_activity')
+        redirectRes.cookies.delete(EMAIL_MFA_COOKIE)
         return redirectRes
       }
     }

@@ -16,6 +16,8 @@ export default function Login() {
     setLoading(true);
     setError('');
 
+    await fetch('/api/mfa/session', { method: 'DELETE' });
+
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,

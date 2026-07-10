@@ -63,7 +63,34 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, removed: factors.length });
+    const { error: sessionsError } = await supabaseAdmin
+      .from('user_mfa_email_sessions')
+      .delete()
+      .eq('user_id', userId);
+
+    if (sessionsError) {
+      return NextResponse.json({ error: sessionsError.message }, { status: 500 });
+    }
+
+    const { error: challengesError } = await supabaseAdmin
+      .from('user_mfa_email_challenges')
+      .delete()
+      .eq('user_id', userId);
+
+    if (challengesError) {
+      return NextResponse.json({ error: challengesError.message }, { status: 500 });
+    }
+
+    const { count, error: settingsError } = await supabaseAdmin
+      .from('user_mfa_email_settings')
+      .delete({ count: 'exact' })
+      .eq('user_id', userId);
+
+    if (settingsError) {
+      return NextResponse.json({ error: settingsError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, removed: factors.length + (count ?? 0) });
   } catch {
     return NextResponse.json({ error: 'Server error.' }, { status: 500 });
   }
