@@ -91,6 +91,7 @@ export default function MfaVerifyPage() {
         setError(result.error ?? 'That code was not accepted. Try the newest email code.');
       } else {
         router.replace('/');
+        router.refresh();
       }
     } catch {
       setError('Network error - could not verify the code.');
@@ -142,4 +143,3 @@ export default function MfaVerifyPage() {
     </main>
   );
 }
-

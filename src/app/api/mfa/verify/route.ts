@@ -118,13 +118,16 @@ export async function POST(req: NextRequest) {
     res.cookies.set(EMAIL_MFA_COOKIE, sessionToken, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: req.nextUrl.protocol === 'https:',
       path: '/',
       maxAge: EMAIL_MFA_SESSION_TTL_SECONDS,
     });
 
     return res;
-  } catch {
-    return NextResponse.json({ error: 'Server error.' }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Server error.' },
+      { status: 500 }
+    );
   }
 }
