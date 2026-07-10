@@ -6,6 +6,7 @@ const INACTIVITY_TIMEOUT = 15 * 60 * 1000 // 15 minutes
 const MFA_SETUP_PATH = '/mfa/setup'
 const MFA_VERIFY_PATH = '/mfa/verify'
 const EMAIL_MFA_COOKIE = 'email_mfa_session'
+const EMAIL_MFA_ENABLED = false // Email 2FA is disabled for now.
 
 const hashMfaToken = async (token: string) => {
   const secret =
@@ -53,46 +54,48 @@ export async function middleware(req: NextRequest) {
   }
 
   if (user && !isLoginPage) {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    if (EMAIL_MFA_ENABLED) {
+      const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      )
 
-    const { data: mfaSetting } = await supabaseAdmin
-      .from('user_mfa_email_settings')
-      .select('verified_at')
-      .eq('user_id', user.id)
-      .maybeSingle()
+      const { data: mfaSetting } = await supabaseAdmin
+        .from('user_mfa_email_settings')
+        .select('verified_at')
+        .eq('user_id', user.id)
+        .maybeSingle()
 
-    const hasEmailMfa = Boolean(mfaSetting?.verified_at)
-    let hasMfaSession = false
+      const hasEmailMfa = Boolean(mfaSetting?.verified_at)
+      let hasMfaSession = false
 
-    if (hasEmailMfa) {
-      const mfaToken = req.cookies.get(EMAIL_MFA_COOKIE)?.value
+      if (hasEmailMfa) {
+        const mfaToken = req.cookies.get(EMAIL_MFA_COOKIE)?.value
 
-      if (mfaToken) {
-        const tokenHash = await hashMfaToken(mfaToken)
-        const { data: mfaSession } = await supabaseAdmin
-          .from('user_mfa_email_sessions')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('token_hash', tokenHash)
-          .gt('expires_at', new Date().toISOString())
-          .maybeSingle()
+        if (mfaToken) {
+          const tokenHash = await hashMfaToken(mfaToken)
+          const { data: mfaSession } = await supabaseAdmin
+            .from('user_mfa_email_sessions')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('token_hash', tokenHash)
+            .gt('expires_at', new Date().toISOString())
+            .maybeSingle()
 
-        hasMfaSession = Boolean(mfaSession)
+          hasMfaSession = Boolean(mfaSession)
+        }
       }
-    }
 
-    if (!hasEmailMfa || !hasMfaSession) {
-      const target = hasEmailMfa ? MFA_VERIFY_PATH : MFA_SETUP_PATH
+      if (!hasEmailMfa || !hasMfaSession) {
+        const target = hasEmailMfa ? MFA_VERIFY_PATH : MFA_SETUP_PATH
 
-      if (req.nextUrl.pathname !== target) {
-        return NextResponse.redirect(new URL(target, req.url))
+        if (req.nextUrl.pathname !== target) {
+          return NextResponse.redirect(new URL(target, req.url))
+        }
+      } else if (isMfaPage) {
+        return NextResponse.redirect(new URL('/', req.url))
       }
-    } else if (isMfaPage) {
-      return NextResponse.redirect(new URL('/', req.url))
     }
 
     const lastActivity = req.cookies.get('last_activity')?.value

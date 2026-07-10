@@ -30,28 +30,12 @@ const features: Feature[] = [
 export default function Home() {
   const [isCG, setIsCG] = useState(false);
   const [canAccessMembers, setCanAccessMembers] = useState(false);
-  const [mfaReady, setMfaReady] = useState(false);
 
   useEffect(() => {
     const checkRole = async () => {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) return;
-
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-
-      if (!accessToken) return;
-
-      const statusRes = await fetch('/api/mfa/status', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const status = await statusRes.json();
-
-      if (!statusRes.ok || !status.verified) {
-        window.location.replace(status.nextPath ?? '/mfa/verify');
-        return;
-      }
 
       const { data } = await supabase
         .from('user_roles')
@@ -60,18 +44,9 @@ export default function Home() {
         .single();
       setIsCG(data?.role === 'cg');
       setCanAccessMembers(MEMBER_ACCESS_ROLES.includes(data?.role ?? ''));
-      setMfaReady(true);
     };
     checkRole();
   }, []);
-
-  if (!mfaReady) {
-    return (
-      <main className="landing-shell">
-        <p className="history-empty">Checking your security session...</p>
-      </main>
-    );
-  }
 
   return (
     <main className="landing-shell">

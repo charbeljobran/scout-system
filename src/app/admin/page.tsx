@@ -240,15 +240,7 @@ export default function AdminPage() {
                         >
                           Reset Password
                         </button>
-                        <button
-                          className="table-action table-action--muted"
-                          type="button"
-                          disabled={mfaSaving || user.id === currentUserId}
-                          onClick={() => handleResetMfa(user)}
-                          title={user.id === currentUserId ? 'Ask another CG to reset your 2FA.' : undefined}
-                        >
-                          {mfaSaving && mfaResettingId === user.id ? 'Resetting...' : 'Reset 2FA'}
-                        </button>
+                        {/* Email 2FA is disabled for now. */}
                       </div>
                     )}
                   </td>

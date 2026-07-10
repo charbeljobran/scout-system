@@ -16,7 +16,7 @@ export default function Login() {
     setLoading(true);
     setError('');
 
-    await fetch('/api/mfa/session', { method: 'DELETE' });
+    // Email 2FA is disabled for now.
 
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
@@ -29,7 +29,7 @@ export default function Login() {
       return;
     }
 
-    router.push('/mfa/verify');
+    router.push('/');
   };
 
   return (
