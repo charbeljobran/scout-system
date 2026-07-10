@@ -14,11 +14,14 @@ export default function AdminPage() {
   const router = useRouter();
   const [users, setUsers] = useState<UserEntry[]>([]);
   const [ready, setReady] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [resettingId, setResettingId] = useState<string | null>(null);
+  const [mfaResettingId, setMfaResettingId] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [saving, setSaving] = useState(false);
+  const [mfaSaving, setMfaSaving] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -47,6 +50,7 @@ export default function AdminPage() {
       const { data, error } = await supabase.rpc('get_all_users');
       if (error) setError('Could not load users.');
       else setUsers(data as UserEntry[]);
+      setCurrentUserId(userId);
       setReady(true);
     };
 
@@ -95,6 +99,55 @@ export default function AdminPage() {
       setError('Network error — could not reach the server.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResetMfa = async (user: UserEntry) => {
+    const confirmed = window.confirm(`Reset 2FA for ${user.email}? They will need to set it up again on next login.`);
+    if (!confirmed) return;
+
+    setMfaResettingId(user.id);
+    setMfaSaving(true);
+    setError('');
+    setSuccess('');
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+
+    if (!accessToken) {
+      setError('Your session has expired. Please log in again.');
+      setMfaSaving(false);
+      setMfaResettingId(null);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/reset-mfa', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setError(result.error ?? 'Could not reset 2FA.');
+      } else {
+        const count = Number(result.removed ?? 0);
+        setSuccess(
+          count > 0
+            ? `2FA reset successfully for ${user.email}. They will set it up again on next login.`
+            : `${user.email} had no 2FA factors to reset.`
+        );
+      }
+    } catch {
+      setError('Network error — could not reach the server.');
+    } finally {
+      setMfaSaving(false);
+      setMfaResettingId(null);
     }
   };
 
@@ -179,13 +232,24 @@ export default function AdminPage() {
                         </button>
                       </div>
                     ) : (
-                      <button
-                        className="table-action"
-                        type="button"
-                        onClick={() => { setResettingId(user.id); setNewPassword(''); setSuccess(''); setError(''); }}
-                      >
-                        Reset Password
-                      </button>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button
+                          className="table-action"
+                          type="button"
+                          onClick={() => { setResettingId(user.id); setNewPassword(''); setSuccess(''); setError(''); }}
+                        >
+                          Reset Password
+                        </button>
+                        <button
+                          className="table-action table-action--muted"
+                          type="button"
+                          disabled={mfaSaving || user.id === currentUserId}
+                          onClick={() => handleResetMfa(user)}
+                          title={user.id === currentUserId ? 'Ask another CG to reset your 2FA.' : undefined}
+                        >
+                          {mfaSaving && mfaResettingId === user.id ? 'Resetting...' : 'Reset 2FA'}
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

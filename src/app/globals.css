@@ -67,15 +67,17 @@ p { color: #4a4540; }
 
 .button--primary   { background: #cc2222; color: #ffffff; }
 .button--secondary { background: #e8e3de; color: #1a1a1a; }
+.button--danger     { background: #8b1a1a; color: #ffffff; }
 
 /* ── INPUTS & SELECTS ── */
 input[type="text"],
 input[type="email"],
 input[type="number"],
 input[type="password"],
+input[type="date"],
+input[type="tel"],
 select,
 textarea {
-  width: 100%;
   padding: 9px 12px;
   border: 1px solid #d8d1ca;
   border-radius: 8px;
@@ -85,6 +87,27 @@ textarea {
   color: #1a1a1a;
   outline: none;
   transition: border-color 0.15s ease;
+}
+
+/* Only stretch to full width when the field is an actual form field
+   (a direct child of a <label>). Standalone toolbar inputs/selects
+   (search boxes, filters, date pickers) keep their own widths below. */
+label > input[type="text"],
+label > input[type="email"],
+label > input[type="number"],
+label > input[type="password"],
+label > input[type="date"],
+label > input[type="tel"],
+label > select,
+label > textarea {
+  width: 100%;
+}
+
+input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #cc2222;
+  cursor: pointer;
 }
 
 input:focus, select:focus, textarea:focus {
@@ -156,6 +179,7 @@ label {
   background: #ffffff;
   outline: none;
   cursor: pointer;
+  min-width: 150px;
 }
 
 /* ── TABLE ── */
@@ -501,6 +525,36 @@ tbody tr:hover { background: #faf8f6; }
   .landing-card--contact { grid-column: 1; }
 }
 /* ── NAVBAR ── */
+.auth-panel {
+  width: 100%;
+  max-width: 420px;
+  padding: 32px;
+}
+
+.auth-panel__header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.auth-panel__header img { margin-bottom: 12px; }
+.auth-panel__header h1 { font-size: 22px; margin-bottom: 6px; }
+.auth-panel__header p { font-size: 13px; color: #76716c; }
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mfa-qr {
+  width: 220px;
+  height: 220px;
+  align-self: center;
+  border: 1px solid #e8e3de;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .navbar {
   background: #ffffff;
   border-bottom: 1px solid #e8e3de;
@@ -937,4 +991,211 @@ th { color: #ffffff; }
 .skeleton-control {
   height: 32px;
   border-radius: 8px;
+}
+
+/* ── MEMBERS / ATTENDANCE ── */
+.form-error {
+  color: #8b1a1a;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.form-success {
+  color: #1a5c2a;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e8e3de;
+}
+
+.form-confirm-text {
+  font-size: 13px;
+  color: #8b1a1a;
+  font-weight: 600;
+}
+
+.field-error {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b1a1a;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.table-row--clickable { cursor: pointer; }
+
+.tab-switch {
+  display: inline-flex;
+  background: #e8e3de;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.tab-switch__item {
+  border: none;
+  background: none;
+  padding: 7px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a4540;
+  cursor: pointer;
+}
+
+.tab-switch__item--active {
+  background: #ffffff;
+  color: #1a1a1a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.attendance-list { padding: 8px; }
+
+.attendance-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.attendance-row + .attendance-row { border-top: 1px solid #f0ece8; }
+
+.attendance-rate {
+  font-size: 13px;
+  font-weight: 700;
+  color: #4a4540;
+}
+
+.date-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-field .search-input { width: 140px; }
+
+.form-warning {
+  color: #8a6100;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  background: #fff6e0;
+  border: 1px solid #f0dca0;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.attendance-row--disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.attendance-row__note {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a68a3a;
+}
+
+.attendance-save-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.attendance-row:hover { background: #faf8f6; }
+
+.attendance-row__branch {
+  font-weight: 500;
+  color: #76716c;
+  font-size: 12px;
+}
+
+.button--small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.session-picker {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 16px;
+  margin-bottom: 4px;
+}
+
+.session-chip {
+  flex-shrink: 0;
+  border: 1px solid #d8d1ca;
+  background: #ffffff;
+  color: #4a4540;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.session-chip:hover { background: #faf8f6; }
+
+.session-chip--active {
+  background: #cc2222;
+  border-color: #cc2222;
+  color: #ffffff;
+}
+
+.attendance-summary {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.attendance-summary__stat {
+  flex: 1;
+  min-width: 140px;
+  background: #faf8f6;
+  border: 1px solid #e8e3de;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.attendance-summary__value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1a1a1a;
+}
+
+.attendance-summary__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #76716c;
+}
+
+.attendance-history {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }

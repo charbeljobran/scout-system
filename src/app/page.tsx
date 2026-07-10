@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { MEMBER_ACCESS_ROLES } from '@/lib/members';
 
 type Feature = {
   href: string;
@@ -28,6 +29,7 @@ const features: Feature[] = [
 
 export default function Home() {
   const [isCG, setIsCG] = useState(false);
+  const [canAccessMembers, setCanAccessMembers] = useState(false);
 
   useEffect(() => {
     const checkRole = async () => {
@@ -40,6 +42,7 @@ export default function Home() {
         .eq('id', userId)
         .single();
       setIsCG(data?.role === 'cg');
+      setCanAccessMembers(MEMBER_ACCESS_ROLES.includes(data?.role ?? ''));
     };
     checkRole();
   }, []);
@@ -59,6 +62,13 @@ export default function Home() {
             <h2 className="landing-card__title">{feature.title}</h2>
           </Link>
         ))}
+
+        {canAccessMembers && (
+          <Link href="/members" className="landing-card panel accent-red">
+            <span className="landing-card__emoji">🧑‍🤝‍🧑</span>
+            <h2 className="landing-card__title">Members</h2>
+          </Link>
+        )}
 
         <Link href="/contact" className="landing-card panel accent-red landing-card--contact">
           <span className="landing-card__emoji">📬</span>

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { MEMBER_ACCESS_ROLES } from '@/lib/members';
 
 const links = [
   { href: '/', label: 'Home' },
@@ -14,6 +15,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [isCG, setIsCG] = useState(false);
+  const [canAccessMembers, setCanAccessMembers] = useState(false);
   const [roleChecked, setRoleChecked] = useState(false);
 
   useEffect(() => {
@@ -24,6 +26,7 @@ export default function Navbar() {
 
         if (!userId) {
           setIsCG(false);
+          setCanAccessMembers(false);
           setRoleChecked(true);
           return;
         }
@@ -36,11 +39,14 @@ export default function Navbar() {
 
         if (error || !data) {
           setIsCG(false);
+          setCanAccessMembers(false);
         } else {
           setIsCG(data.role === 'cg');
+          setCanAccessMembers(MEMBER_ACCESS_ROLES.includes(data.role));
         }
       } catch {
         setIsCG(false);
+        setCanAccessMembers(false);
       } finally {
         setRoleChecked(true);
       }
@@ -91,6 +97,14 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
+          {canAccessMembers && (
+            <Link
+              className={`nav-link ${pathname === '/members' ? 'nav-link--active' : ''}`}
+              href="/members"
+            >
+              Members
+            </Link>
+          )}
           {isCG && (
             <Link
               className={`nav-link ${pathname === '/admin' ? 'nav-link--active' : ''}`}

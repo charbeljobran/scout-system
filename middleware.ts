@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const INACTIVITY_TIMEOUT = 15 * 60 * 1000 // 15 minutes
+const MFA_SETUP_PATH = '/mfa/setup'
+const MFA_VERIFY_PATH = '/mfa/verify'
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: req })
@@ -27,6 +29,7 @@ export async function middleware(req: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   const isLoginPage = req.nextUrl.pathname === '/login'
+  const isMfaPage = req.nextUrl.pathname === MFA_SETUP_PATH || req.nextUrl.pathname === MFA_VERIFY_PATH
 
   if (!user && !isLoginPage) {
     return NextResponse.redirect(new URL('/login', req.url))
@@ -37,6 +40,18 @@ export async function middleware(req: NextRequest) {
   }
 
   if (user && !isLoginPage) {
+    const { data: assurance } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+
+    if (assurance?.currentLevel !== 'aal2') {
+      const target = assurance?.nextLevel === 'aal2' ? MFA_VERIFY_PATH : MFA_SETUP_PATH
+
+      if (req.nextUrl.pathname !== target) {
+        return NextResponse.redirect(new URL(target, req.url))
+      }
+    } else if (isMfaPage) {
+      return NextResponse.redirect(new URL('/', req.url))
+    }
+
     const lastActivity = req.cookies.get('last_activity')?.value
     const now = Date.now()
 
@@ -62,5 +77,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/inventory/:path*', '/contact', '/about', '/login', '/admin'],
+  matcher: ['/', '/inventory/:path*', '/contact', '/about', '/login', '/admin', '/members', '/mfa/:path*'],
 }
