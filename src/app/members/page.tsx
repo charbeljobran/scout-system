@@ -77,7 +77,7 @@ const skeletonWidth = (i: number, j: number) => `${55 + ((i + j) % 4) * 12}%`;
 const formatSessionDate = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 
-function AttendanceSummary({ rows, loading }: { rows: AttendanceRow[]; loading: boolean }) {
+function AttendanceSummary({ rows, loading, editedDates }: { rows: AttendanceRow[]; loading: boolean; editedDates?: Set<string> }) {
   if (loading) {
     return (
       <div className="attendance-history">
@@ -114,7 +114,10 @@ function AttendanceSummary({ rows, loading }: { rows: AttendanceRow[]; loading: 
       <div className="attendance-history">
         {rows.map(row => (
           <div className="attendance-row" key={row.id}>
-            <span>{formatSessionDate(row.meeting_date)}</span>
+            <span>
+              {formatSessionDate(row.meeting_date)}
+              {editedDates?.has(row.meeting_date) && <span className="edited-badge">Edited</span>}
+            </span>
             <span className={`history-action history-action--${row.present ? 'in' : 'out'}`}>
               {row.present ? 'Present' : 'Absent'}
             </span>
@@ -160,6 +163,7 @@ export default function MembersPage() {
   const [attendanceDateInput, setAttendanceDateInput] = useState(isoToDMY(todayIso()));
   const [dateError, setDateError] = useState('');
   const [attendanceMap, setAttendanceMap] = useState<Record<string, boolean>>({});
+  const [attendanceMapOriginal, setAttendanceMapOriginal] = useState<Record<string, boolean>>({});
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [attendanceSuccess, setAttendanceSuccess] = useState('');
@@ -173,6 +177,7 @@ export default function MembersPage() {
   const [lookupMember, setLookupMember] = useState<MemberRow | null>(null);
   const [lookupRows, setLookupRows] = useState<AttendanceRow[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupEditedDates, setLookupEditedDates] = useState<Set<string>>(new Set());
 
   // cg and secretaire both have global members and attendance access.
   const canViewAllBranches = isCgUser || isSecretaire;
@@ -324,6 +329,7 @@ export default function MembersPage() {
 
     if (memberIds.length === 0) {
       setAttendanceMap({});
+      setAttendanceMapOriginal({});
       setSessionAlreadySaved(false);
       setAttendanceLoading(false);
       return;
@@ -339,16 +345,18 @@ export default function MembersPage() {
     const map: Record<string, boolean> = {};
     rows.forEach(row => { map[row.member_id] = row.present; });
     setAttendanceMap(map);
+    setAttendanceMapOriginal(map);
     setSessionAlreadySaved(rows.length > 0);
     setAttendanceLoading(false);
   };
 
-  // Once a session has been saved, regular leaders can no longer edit it —
-  // only cg can go back and correct a past sheet. secretaire can never
-  // mark attendance at all, regardless of save state.
+  // Branch leaders can now edit an already-saved sheet too — the only thing
+  // that ever blocks marking attendance is not having a branch (or being on
+  // a role with no marking rights at all, e.g. secretaire used to be
+  // read-only; both cg and secretaire have full write access now).
   const attendanceReadOnlyRole = !canMarkAttendance;
-  const attendanceLockedBySave = sessionAlreadySaved && !isCgUser && !isSecretaire;
-  const attendanceLocked = attendanceReadOnlyRole || attendanceLockedBySave;
+  const attendanceLocked = attendanceReadOnlyRole;
+  const isLeaderEdit = sessionAlreadySaved && !isCgUser && !isSecretaire;
 
   const togglePresent = (memberId: string) => {
     if (attendanceLocked) return;
@@ -361,23 +369,48 @@ export default function MembersPage() {
     setSavingAttendance(true);
     setAttendanceSuccess('');
 
-    const rows = attendanceRoster
-      .filter(m => isEligibleForDate(m, attendanceDate))
-      .map(m => ({
-        member_id: m.id,
-        meeting_date: attendanceDate,
-        present: Boolean(attendanceMap[m.id]),
-        marked_by: currentUserId,
-      }));
+    const eligibleMembers = attendanceRoster.filter(m => isEligibleForDate(m, attendanceDate));
+
+    const rows = eligibleMembers.map(m => ({
+      member_id: m.id,
+      meeting_date: attendanceDate,
+      present: Boolean(attendanceMap[m.id]),
+      marked_by: currentUserId,
+    }));
 
     const { error } = await supabase
       .from('attendance')
       .upsert(rows, { onConflict: 'member_id,meeting_date' });
 
+    if (!error && isLeaderEdit) {
+      // Log one event per member whose value actually changed, so cg/secretaire
+      // get a notification and a history record of what changed.
+      const { data: userData } = await supabase.auth.getUser();
+      const editorEmail = userData.user?.email ?? '';
+
+      const changedEvents = eligibleMembers
+        .filter(m => Boolean(attendanceMapOriginal[m.id]) !== Boolean(attendanceMap[m.id]))
+        .map(m => ({
+          member_id: m.id,
+          meeting_date: attendanceDate,
+          branch: m.branch,
+          edited_by: currentUserId,
+          edited_by_email: editorEmail,
+          previous_present: Boolean(attendanceMapOriginal[m.id]),
+          new_present: Boolean(attendanceMap[m.id]),
+        }));
+
+      if (changedEvents.length > 0) {
+        await supabase.from('attendance_edit_events').insert(changedEvents);
+      }
+    }
+
     setSavingAttendance(false);
     if (!error) {
       setAttendanceSuccess('Attendance saved.');
       setSessionAlreadySaved(true);
+      setAttendanceMapOriginal(attendanceMap);
+
     }
   };
 
@@ -589,18 +622,19 @@ export default function MembersPage() {
   const openLookup = async (member: MemberRow) => {
     setLookupMember(member);
     setLookupLoading(true);
-    const { data } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('member_id', member.id)
-      .order('meeting_date', { ascending: false });
+    const [{ data }, { data: editData }] = await Promise.all([
+      supabase.from('attendance').select('*').eq('member_id', member.id).order('meeting_date', { ascending: false }),
+      supabase.from('attendance_edit_events').select('meeting_date').eq('member_id', member.id),
+    ]);
     setLookupRows((data as AttendanceRow[]) ?? []);
+    setLookupEditedDates(new Set(((editData as { meeting_date: string }[]) ?? []).map(r => r.meeting_date)));
     setLookupLoading(false);
   };
 
   const closeLookup = () => {
     setLookupMember(null);
     setLookupRows([]);
+    setLookupEditedDates(new Set());
   };
 
   const isAnyModalOpen = Boolean(viewingMember) || Boolean(lookupMember);
@@ -966,9 +1000,9 @@ export default function MembersPage() {
           {attendanceSuccess && <p className="form-success">{attendanceSuccess}</p>}
           {attendanceReadOnlyRole ? (
             <p className="form-warning">You have view-only access to attendance.</p>
-          ) : attendanceLockedBySave && (
+          ) : isLeaderEdit && (
             <p className="form-warning">
-              Attendance for {formatSessionDate(attendanceDate)} was already saved and can no longer be changed. Contact the CG or secretaire if this needs correcting.
+              
             </p>
           )}
 
@@ -1281,7 +1315,7 @@ export default function MembersPage() {
               <button className="history-close" type="button" onClick={closeLookup}>✕</button>
             </div>
             <div className="history-modal__body">
-              <AttendanceSummary rows={lookupRows} loading={lookupLoading} />
+              <AttendanceSummary rows={lookupRows} loading={lookupLoading} editedDates={lookupEditedDates} />
             </div>
           </div>
         </div>
