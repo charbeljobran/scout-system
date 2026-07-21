@@ -441,7 +441,21 @@ tbody tr:hover { background: #faf8f6; }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: 12px;
+}
+
+/* Long item names / member names shouldn't push the status pill off the
+   card on narrow phones — truncate the label instead of overflowing. */
+.inventory-card__header > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventory-card__header > span:last-child {
+  flex-shrink: 0;
 }
 
 .inventory-card__body { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -713,6 +727,7 @@ tbody tr:hover { background: #faf8f6; }
   top: calc(100% + 8px);
   right: 0;
   width: 320px;
+  max-width: calc(100vw - 32px);
   max-height: 400px;
   overflow-y: auto;
   background: #ffffff;
@@ -1227,6 +1242,18 @@ th { color: #ffffff; }
   font-weight: 600;
   color: #1a1a1a;
   cursor: pointer;
+}
+
+.attendance-row > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attendance-row > span:last-child,
+.attendance-row > input {
+  flex-shrink: 0;
 }
 
 .attendance-row + .attendance-row { border-top: 1px solid #f0ece8; }
