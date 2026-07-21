@@ -16,6 +16,7 @@ import {
   isoToDMY,
   maskDateInput,
   displayableMemberRoles,
+  FEEDER_BRANCH,
   memberRoleLabel,
   memberRolesForBranch,
   parseDMY,
@@ -151,6 +152,8 @@ export default function MembersPage() {
   const [branchFilter, setBranchFilter] = useState<Branch | ''>('');
 
   const [isAdding, setIsAdding] = useState(false);
+  const [addMode, setAddMode] = useState<'new' | 'existing'>('new');
+  const [existingSearch, setExistingSearch] = useState('');
   const [form, setForm] = useState<MemberFormState>(emptyForm);
   const [dobInput, setDobInput] = useState('');
   const [dobError, setDobError] = useState('');
@@ -184,6 +187,10 @@ export default function MembersPage() {
   const [lookupRows, setLookupRows] = useState<AttendanceRow[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupEditedDates, setLookupEditedDates] = useState<Set<string>>(new Set());
+
+  const [promoteConfirmId, setPromoteConfirmId] = useState<string | null>(null);
+  const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [promoteError, setPromoteError] = useState('');
 
   // cg and secretaire both have global members and attendance access.
   const canViewAllBranches = isCgUser || isSecretaire;
@@ -238,12 +245,58 @@ export default function MembersPage() {
     if (!error) setMembers((data as MemberRow[]) ?? []);
   };
 
-  const filteredMembers = useMemo(() => members.filter(m => {
+  // Everyone this account should treat as "their" roster — everyone for
+  // cg/secretaire, otherwise just their own branch. A branch leader can also
+  // see their feeder branch (via RLS), but only for the promotion panel
+  // below, never as part of their own roster/attendance/export.
+  const ownBranchMembers = useMemo(() => (
+    canViewAllBranches ? members : members.filter(m => m.branch === myBranch)
+  ), [members, canViewAllBranches, myBranch]);
+
+  // Members in the branch that feeds into this leader's branch (e.g.
+  // Louveteaux for an Eclaireurs leader) — candidates to promote up.
+  const incomingMembers = useMemo(() => {
+    if (canViewAllBranches || !myBranch) return [];
+    const feeder = FEEDER_BRANCH[myBranch];
+    if (!feeder) return [];
+    return members.filter(m => m.branch === feeder);
+  }, [members, canViewAllBranches, myBranch]);
+
+  const feederBranch = myBranch ? FEEDER_BRANCH[myBranch] : undefined;
+
+  // Narrows incomingMembers down as the leader types a name, for the
+  // "Existing Member" search box in the Add Member panel.
+  const matchingIncoming = useMemo(() => {
+    if (!existingSearch.trim()) return incomingMembers;
+    const q = existingSearch.toLowerCase();
+    return incomingMembers.filter(m => `${m.first_name} ${m.last_name}`.toLowerCase().includes(q));
+  }, [incomingMembers, existingSearch]);
+
+  // Moves a member from the feeder branch straight into this leader's
+  // branch — they already exist in the database, so no re-entry needed.
+  const handlePromote = async (member: MemberRow) => {
+    setPromotingId(member.id);
+    setPromoteError('');
+
+    const { error } = await supabase.rpc('promote_member', { p_member_id: member.id });
+
+    setPromotingId(null);
+    setPromoteConfirmId(null);
+
+    if (error) {
+      setPromoteError(error.message || 'Could not add this member to your branch.');
+      return;
+    }
+
+    await fetchMembers();
+  };
+
+  const filteredMembers = useMemo(() => ownBranchMembers.filter(m => {
     const fullName = `${m.first_name} ${m.last_name}`.toLowerCase();
     const matchSearch = search ? fullName.includes(search.toLowerCase()) : true;
     const matchBranch = branchFilter ? m.branch === branchFilter : true;
     return matchSearch && matchBranch;
-  }), [members, search, branchFilter]);
+  }), [ownBranchMembers, search, branchFilter]);
 
   const handleExportExcel = async () => {
     if (filteredMembers.length === 0) {
@@ -282,8 +335,8 @@ export default function MembersPage() {
   // Roster used for the attendance sheet: branch-filtered (for cg) but not
   // name-searched, so the full list to check off is always visible.
   const attendanceRoster = useMemo(() => (
-    branchFilter ? members.filter(m => m.branch === branchFilter) : members
-  ), [members, branchFilter]);
+    branchFilter ? ownBranchMembers.filter(m => m.branch === branchFilter) : ownBranchMembers
+  ), [ownBranchMembers, branchFilter]);
 
   // A member can't be marked for a session date before they joined.
   const isEligibleForDate = (member: MemberRow, date: string) => member.created_at.slice(0, 10) <= date;
@@ -735,7 +788,17 @@ export default function MembersPage() {
                 Export to Excel
               </button>
               {canAddMember && (
-                <button className="button button--primary" type="button" onClick={() => setIsAdding(v => !v)}>
+                <button
+                  className="button button--primary"
+                  type="button"
+                  onClick={() => {
+                    setIsAdding(v => !v);
+                    setAddMode('new');
+                    setExistingSearch('');
+                    setPromoteConfirmId(null);
+                    setPromoteError('');
+                  }}
+                >
                   {isAdding ? 'Close' : 'Add Member'}
                 </button>
               )}
@@ -745,8 +808,83 @@ export default function MembersPage() {
           {isAdding && (
             <section className="panel form-card accent-red" aria-label="Add member">
               <div className="form-card__header">
-                <h2>New Member</h2>
+                <h2>{addMode === 'existing' ? 'Add Existing Member' : 'New Member'}</h2>
               </div>
+
+              {!canViewAllBranches && myBranch && feederBranch && (
+                <div className="tab-switch" style={{ marginBottom: 16 }}>
+                  <button
+                    type="button"
+                    className={`tab-switch__item ${addMode === 'new' ? 'tab-switch__item--active' : ''}`}
+                    onClick={() => setAddMode('new')}
+                  >
+                    New Member
+                  </button>
+                  <button
+                    type="button"
+                    className={`tab-switch__item ${addMode === 'existing' ? 'tab-switch__item--active' : ''}`}
+                    onClick={() => setAddMode('existing')}
+                  >
+                    Existing Member
+                  </button>
+                </div>
+              )}
+
+              {addMode === 'existing' && !canViewAllBranches && myBranch && feederBranch ? (
+                <div>
+                  <p style={{ fontSize: 13, color: '#76716c', marginBottom: 12 }}>
+                    Search {branchLabel(feederBranch)} for a member who's ready to move up into {branchLabel(myBranch)}. They keep their same record — attendance history and details included.
+                  </p>
+                  <input
+                    className="search-input"
+                    type="text"
+                    placeholder={`Search ${branchLabel(feederBranch)} by name...`}
+                    value={existingSearch}
+                    onChange={e => setExistingSearch(e.target.value)}
+                    autoFocus
+                  />
+                  {promoteError && <p className="form-error">{promoteError}</p>}
+                  <div className="attendance-history" style={{ marginTop: 12 }}>
+                    {matchingIncoming.length === 0 ? (
+                      <p className="history-empty">
+                        {existingSearch ? 'No matches found.' : `No members currently in ${branchLabel(feederBranch)}.`}
+                      </p>
+                    ) : matchingIncoming.map(m => (
+                      <div className="attendance-row" key={m.id}>
+                        <span>{m.first_name} {m.last_name} · {calculateAge(m.date_of_birth)}y</span>
+                        {promoteConfirmId === m.id ? (
+                          <span style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                            <button
+                              type="button"
+                              className="button button--primary button--small"
+                              disabled={promotingId === m.id}
+                              onClick={() => handlePromote(m)}
+                            >
+                              {promotingId === m.id ? 'Adding...' : 'Confirm'}
+                            </button>
+                            <button
+                              type="button"
+                              className="button button--secondary button--small"
+                              disabled={promotingId === m.id}
+                              onClick={() => setPromoteConfirmId(null)}
+                            >
+                              Cancel
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="button button--secondary button--small"
+                            onClick={() => setPromoteConfirmId(m.id)}
+                          >
+                            Add to {branchLabel(myBranch)}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
               <form onSubmit={handleAddMember}>
                 {error && <p className="form-error">{error}</p>}
                 <div className="form-grid">
@@ -901,6 +1039,7 @@ export default function MembersPage() {
                   {saving ? 'Adding...' : 'Add Member'}
                 </button>
               </form>
+              )}
             </section>
           )}
 

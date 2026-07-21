@@ -39,6 +39,22 @@ export const ROLE_TO_BRANCH: Record<string, Branch> = {
   routier: 'routiers',
 };
 
+// The branch each branch feeds into as members age up. Terminal branches
+// (routiers, pionnieres) have no next step and are omitted.
+export const NEXT_BRANCH: Partial<Record<Branch, Branch>> = {
+  louveteaux: 'eclaireurs',
+  eclaireurs: 'routiers',
+  louvettes: 'eclaireuses',
+  eclaireuses: 'pionnieres',
+};
+
+// Reverse of NEXT_BRANCH — the branch that feeds INTO a given branch, i.e.
+// where a leader should look for members who are ready to move up into
+// their branch. Branches with no feeder (louveteaux, louvettes) are omitted.
+export const FEEDER_BRANCH: Partial<Record<Branch, Branch>> = Object.fromEntries(
+  Object.entries(NEXT_BRANCH).map(([from, to]) => [to, from])
+) as Partial<Record<Branch, Branch>>;
+
 export const GLOBAL_VISIBILITY_ROLES = ['cg', 'secretaire'];
 
 // Everyone allowed to see the Members/Attendance feature at all.
