@@ -48,6 +48,44 @@ export function branchLabel(branch: string): string {
   return BRANCHES.find(b => b.value === branch)?.label ?? branch;
 }
 
+// In-troop function/position tags a member can hold (separate from login
+// access roles). 'member' is the mandatory baseline every member always
+// has, regardless of branch. Everything else is optional and additive.
+export type MemberRole = 'member' | 'animateur' | 'gerant' | 'intendant' | 'secretaire' | 'cp' | 'sp' | 'ce' | 'si' | 'se' | 'photographe';
+
+const NON_CUB_BRANCHES: Branch[] = ['eclaireurs', 'eclaireuses', 'routiers', 'pionnieres'];
+
+export const ALL_MEMBER_ROLES: { value: MemberRole; label: string; branches?: Branch[] }[] = [
+  { value: 'member', label: 'Member' },
+  { value: 'animateur', label: 'Animateur', branches: NON_CUB_BRANCHES },
+  { value: 'gerant', label: 'Gérant', branches: NON_CUB_BRANCHES },
+  { value: 'intendant', label: 'Intendant', branches: NON_CUB_BRANCHES },
+  { value: 'secretaire', label: 'Secrétaire', branches: NON_CUB_BRANCHES },
+  { value: 'photographe', label: 'Photographe', branches: NON_CUB_BRANCHES },
+  { value: 'cp', label: 'CP', branches: ['eclaireurs', 'eclaireuses'] },
+  { value: 'sp', label: 'SP', branches: ['eclaireurs', 'eclaireuses'] },
+  { value: 'ce', label: 'CE', branches: ['routiers', 'pionnieres'] },
+  { value: 'si', label: 'SI', branches: ['louveteaux', 'louvettes'] },
+  { value: 'se', label: 'SE', branches: ['louveteaux', 'louvettes'] },
+];
+
+// Optional, selectable role tags for a given branch — excludes 'member',
+// since that one is mandatory and always applied automatically, not chosen.
+export function memberRolesForBranch(branch: Branch | ''): typeof ALL_MEMBER_ROLES {
+  return ALL_MEMBER_ROLES.filter(r => r.value !== 'member' && (!r.branches || (branch && r.branches.includes(branch as Branch))));
+}
+
+export function memberRoleLabel(role: string): string {
+  return ALL_MEMBER_ROLES.find(r => r.value === role)?.label ?? role;
+}
+
+// 'member' is the mandatory baseline, always stored — but only worth
+// showing in the UI when it's the ONLY tag a member has. Once they have
+// an actual function/position, that's what should be displayed.
+export function displayableMemberRoles(roles: string[]): string[] {
+  return roles.length > 1 ? roles.filter(r => r !== 'member') : roles;
+}
+
 export function calculateAge(dob: string): number {
   const birth = new Date(dob);
   const today = new Date();

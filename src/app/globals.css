@@ -361,6 +361,72 @@ tbody tr:hover { background: #faf8f6; }
   color: #4a4540;
 }
 
+.role-tag-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.role-tag-group__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.role-tag-group__note {
+  font-size: 11px;
+  color: #76716c;
+  margin: -4px 0 0;
+}
+
+.role-tag-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.role-tag-checkbox {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #f5f3f0;
+  border: 1px solid #d8d1ca;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a4540;
+  cursor: pointer;
+  width: auto;
+}
+
+.role-tag-checkbox input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+}
+
+.role-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.role-tag {
+  padding: 2px 9px;
+  border-radius: 10px;
+  background: #f0ece8;
+  border: 1px solid #d8d1ca;
+  color: #4a4540;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.role-tags-empty { color: #a8a29b; }
+
 /* ── MOBILE CARDS ── */
 .mobile-cards { display: none; }
 
@@ -1192,6 +1258,7 @@ th { color: #ffffff; }
 }
 
 .date-field .search-input { width: 140px; }
+
 
 .attendance-row--disabled {
   opacity: 0.6;

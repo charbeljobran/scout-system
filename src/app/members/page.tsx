@@ -15,6 +15,9 @@ import {
   calculateAge,
   isoToDMY,
   maskDateInput,
+  displayableMemberRoles,
+  memberRoleLabel,
+  memberRolesForBranch,
   parseDMY,
   todayIso,
 } from '@/lib/members';
@@ -33,6 +36,7 @@ type MemberRow = {
   email: string | null;
   medical_note: string | null;
   notes: string | null;
+  roles: string[];
   added_by: string;
   created_at: string;
 };
@@ -56,6 +60,7 @@ type MemberFormState = {
   email: string;
   medical_note: string;
   notes: string;
+  roles: string[];
 };
 
 const emptyForm: MemberFormState = {
@@ -70,6 +75,7 @@ const emptyForm: MemberFormState = {
   email: '',
   medical_note: '',
   notes: '',
+  roles: [],
 };
 
 const skeletonWidth = (i: number, j: number) => `${55 + ((i + j) % 4) * 12}%`;
@@ -464,6 +470,7 @@ export default function MembersPage() {
       email: form.email.trim() || null,
       medical_note: form.medical_note.trim() || null,
       notes: form.notes.trim() || null,
+      roles: ['member', ...form.roles.filter(r => memberRolesForBranch(branch).some(mr => mr.value === r))],
       added_by: currentUserId,
     });
 
@@ -497,6 +504,7 @@ export default function MembersPage() {
       email: member.email ?? '',
       medical_note: member.medical_note ?? '',
       notes: member.notes ?? '',
+      roles: member.roles ?? [],
     });
   };
 
@@ -558,6 +566,7 @@ export default function MembersPage() {
         email: editForm.email.trim() || null,
         medical_note: editForm.medical_note.trim() || null,
         notes: editForm.notes.trim() || null,
+        roles: ['member', ...editForm.roles.filter(r => memberRolesForBranch(editForm.branch).some(mr => mr.value === r))],
         updated_at: new Date().toISOString(),
       })
       .eq('id', viewingMember.id);
@@ -764,7 +773,14 @@ export default function MembersPage() {
                   Branch
                   <select
                     value={(isCgUser || isSecretaire) ? form.branch : (myBranch ?? '')}
-                    onChange={e => setForm(f => ({ ...f, branch: e.target.value as Branch }))}
+                    onChange={e => {
+                      const newBranch = e.target.value as Branch;
+                      setForm(f => ({
+                        ...f,
+                        branch: newBranch,
+                        roles: f.roles.filter(r => memberRolesForBranch(newBranch).some(mr => mr.value === r)),
+                      }));
+                    }}
                     disabled={!(isCgUser || isSecretaire)}
                     required
                   >
@@ -862,6 +878,25 @@ export default function MembersPage() {
                     onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                   />
                 </label>
+                <div className="role-tag-group">
+                  <span className="role-tag-group__label">Additional Roles (optional)</span>
+                  <p className="role-tag-group__note">Every member is automatically tagged "Member".</p>
+                  <div className="role-tag-options">
+                    {memberRolesForBranch((isCgUser || isSecretaire) ? form.branch : (myBranch ?? '')).map(r => (
+                      <label key={r.value} className="role-tag-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={form.roles.includes(r.value)}
+                          onChange={e => setForm(f => ({
+                            ...f,
+                            roles: e.target.checked ? [...f.roles, r.value] : f.roles.filter(x => x !== r.value),
+                          }))}
+                        />
+                        {r.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <button className="button button--primary" type="submit" disabled={saving}>
                   {saving ? 'Adding...' : 'Add Member'}
                 </button>
@@ -878,6 +913,7 @@ export default function MembersPage() {
                     <th>Age</th>
                     <th>Branch</th>
                     <th>Gender</th>
+                    <th>Roles</th>
                     <th>Attendance</th>
                   </tr>
                 </thead>
@@ -885,13 +921,13 @@ export default function MembersPage() {
                   {membersLoading ? (
                     Array.from({ length: 5 }).map((_, i) => (
                       <tr key={i} aria-hidden="true">
-                        {Array.from({ length: 5 }).map((_, j) => (
+                        {Array.from({ length: 6 }).map((_, j) => (
                           <td key={j}><span className="skeleton skeleton-text" style={{ width: skeletonWidth(i, j) }} /></td>
                         ))}
                       </tr>
                     ))
                   ) : filteredMembers.length === 0 ? (
-                    <tr><td colSpan={5} className="history-empty">No members yet.</td></tr>
+                    <tr><td colSpan={6} className="history-empty">No members yet.</td></tr>
                   ) : (
                     filteredMembers.map(m => (
                       <tr key={m.id} className="table-row--clickable" onClick={() => openMember(m)}>
@@ -899,6 +935,15 @@ export default function MembersPage() {
                         <td>{calculateAge(m.date_of_birth)}</td>
                         <td>{branchLabel(m.branch)}</td>
                         <td style={{ textTransform: 'capitalize' }}>{m.gender}</td>
+                        <td>
+                          {m.roles.length === 0 ? (
+                            <span className="role-tags-empty">—</span>
+                          ) : (
+                            <div className="role-tags">
+                              {displayableMemberRoles(m.roles).map(r => <span className="role-tag" key={r}>{memberRoleLabel(r)}</span>)}
+                            </div>
+                          )}
+                        </td>
                         <td>
                           <button
                             className="button button--secondary button--small"
@@ -944,6 +989,11 @@ export default function MembersPage() {
                       <span>Gender</span>
                       <span style={{ textTransform: 'capitalize' }}>{m.gender}</span>
                     </div>
+                    {m.roles.length > 0 && (
+                      <div className="role-tags">
+                        {displayableMemberRoles(m.roles).map(r => <span className="role-tag" key={r}>{memberRoleLabel(r)}</span>)}
+                      </div>
+                    )}
                   </div>
                   <button
                     className="button button--secondary button--small"
@@ -1002,7 +1052,6 @@ export default function MembersPage() {
             <p className="form-warning">You have view-only access to attendance.</p>
           ) : isLeaderEdit && (
             <p className="form-warning">
-              
             </p>
           )}
 
@@ -1158,7 +1207,14 @@ export default function MembersPage() {
                   Branch
                   <select
                     value={editForm.branch}
-                    onChange={e => setEditForm(f => f && ({ ...f, branch: e.target.value as Branch }))}
+                    onChange={e => {
+                      const newBranch = e.target.value as Branch;
+                      setEditForm(f => f && ({
+                        ...f,
+                        branch: newBranch,
+                        roles: f.roles.filter(r => memberRolesForBranch(newBranch).some(mr => mr.value === r)),
+                      }));
+                    }}
                     disabled={!canEditViewingMember || !(isCgUser || isSecretaire)}
                     required
                   >
@@ -1260,6 +1316,26 @@ export default function MembersPage() {
                     disabled={!canEditViewingMember}
                   />
                 </label>
+                <div className="role-tag-group">
+                  <span className="role-tag-group__label">Additional Roles</span>
+                  <p className="role-tag-group__note">Every member is automatically tagged "Member".</p>
+                  <div className="role-tag-options">
+                    {memberRolesForBranch(editForm.branch).map(r => (
+                      <label key={r.value} className="role-tag-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={editForm.roles.includes(r.value)}
+                          disabled={!canEditViewingMember}
+                          onChange={e => setEditForm(f => f && ({
+                            ...f,
+                            roles: e.target.checked ? [...f.roles, r.value] : f.roles.filter(x => x !== r.value),
+                          }))}
+                        />
+                        {r.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
                 {canEditViewingMember && (
                   <div className="form-actions">
