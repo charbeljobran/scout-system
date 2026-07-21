@@ -1357,3 +1357,56 @@ th { color: #ffffff; }
   flex-direction: column;
   gap: 4px;
 }
+
+/* Keep the application controls usable without horizontal page overflow on phones. */
+@media (max-width: 640px) {
+  .page-shell { padding: 24px 16px; }
+
+  .panel:not(.table-panel) { padding: 16px; }
+
+  .navbar { padding: 0 16px; }
+
+  .navbar__inner {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    gap: 0 8px;
+  }
+
+  .nav-links {
+    width: 100%;
+    padding-bottom: 8px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .nav-link { padding: 6px 8px; }
+  .nav-signout { margin-left: 0; padding: 6px 10px; }
+
+  .notif-dropdown {
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .section-header { align-items: flex-start; }
+  .toolbar { width: 100%; }
+  .toolbar .search-input { width: 100%; flex: 1 1 180px; }
+  .toolbar .select { min-width: 0; flex: 1 1 140px; }
+
+  .history-overlay { padding: 0; align-items: flex-end; }
+
+  .history-modal {
+    width: 100%;
+    max-width: none;
+    max-height: 90dvh;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .history-modal__header { padding: 16px; }
+  .history-modal__body { padding: 12px 16px; overflow: auto; }
+
+  .history-table { min-width: 560px; }
+
+  .tab-switch { max-width: 100%; overflow-x: auto; }
+}
