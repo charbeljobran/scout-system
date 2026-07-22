@@ -17,6 +17,7 @@ import {
   maskDateInput,
   displayableMemberRoles,
   FEEDER_BRANCH,
+  NEXT_BRANCH,
   memberRoleLabel,
   memberRolesForBranch,
   parseDMY,
@@ -191,6 +192,7 @@ export default function MembersPage() {
   const [promoteConfirmId, setPromoteConfirmId] = useState<string | null>(null);
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [promoteError, setPromoteError] = useState('');
+  const [existingSourceBranch, setExistingSourceBranch] = useState<Branch | ''>('');
 
   // cg and secretaire both have global members and attendance access.
   const canViewAllBranches = isCgUser || isSecretaire;
@@ -253,38 +255,50 @@ export default function MembersPage() {
     canViewAllBranches ? members : members.filter(m => m.branch === myBranch)
   ), [members, canViewAllBranches, myBranch]);
 
-  // Members in the branch that feeds into this leader's branch (e.g.
-  // Louveteaux for an Eclaireurs leader) — candidates to promote up.
-  const incomingMembers = useMemo(() => {
-    if (canViewAllBranches || !myBranch) return [];
-    const feeder = FEEDER_BRANCH[myBranch];
-    if (!feeder) return [];
-    return members.filter(m => m.branch === feeder);
-  }, [members, canViewAllBranches, myBranch]);
-
+  // Branch leaders always move members feeder-branch -> their own branch.
+  // cg/secretaire aren't tied to a branch, so they choose both ends
+  // themselves via the dropdowns in the Existing Member panel.
   const feederBranch = myBranch ? FEEDER_BRANCH[myBranch] : undefined;
+  const promoteTargetBranch: Branch | '' = canViewAllBranches
+    ? (existingSourceBranch ? (NEXT_BRANCH[existingSourceBranch] ?? '') : '')
+    : (myBranch ?? '');
+  const promoteSourceBranch: Branch | '' = canViewAllBranches
+    ? existingSourceBranch
+    : (feederBranch ?? '');
 
-  // Narrows incomingMembers down as the leader types a name, for the
-  // "Existing Member" search box in the Add Member panel.
+  // The pool of members eligible to move into promoteTargetBranch, narrowed
+  // by the name search box.
   const matchingIncoming = useMemo(() => {
-    if (!existingSearch.trim()) return incomingMembers;
+    if (!promoteSourceBranch) return [];
+    const pool = members.filter(m => m.branch === promoteSourceBranch);
+    if (!existingSearch.trim()) return pool;
     const q = existingSearch.toLowerCase();
-    return incomingMembers.filter(m => `${m.first_name} ${m.last_name}`.toLowerCase().includes(q));
-  }, [incomingMembers, existingSearch]);
+    return pool.filter(m => `${m.first_name} ${m.last_name}`.toLowerCase().includes(q));
+  }, [members, promoteSourceBranch, existingSearch]);
 
-  // Moves a member from the feeder branch straight into this leader's
-  // branch — they already exist in the database, so no re-entry needed.
+  // Moves a member from the source branch into promoteTargetBranch — they
+  // already exist in the database, so no re-entry needed. Branch leaders'
+  // target/source are fixed by their role; cg/secretaire choose both via
+  // the dropdowns, so we pass the chosen target branch explicitly for them.
   const handlePromote = async (member: MemberRow) => {
+    if (canViewAllBranches && !promoteTargetBranch) {
+      setPromoteError('Choose a branch to add this member to first.');
+      return;
+    }
+
     setPromotingId(member.id);
     setPromoteError('');
 
-    const { error } = await supabase.rpc('promote_member', { p_member_id: member.id });
+    const { error } = await supabase.rpc('promote_member', {
+      p_member_id: member.id,
+      p_target_branch: canViewAllBranches ? promoteTargetBranch : null,
+    });
 
     setPromotingId(null);
     setPromoteConfirmId(null);
 
     if (error) {
-      setPromoteError(error.message || 'Could not add this member to your branch.');
+      setPromoteError(error.message || 'Could not add this member to that branch.');
       return;
     }
 
@@ -795,6 +809,7 @@ export default function MembersPage() {
                     setIsAdding(v => !v);
                     setAddMode('new');
                     setExistingSearch('');
+                    setExistingSourceBranch('');
                     setPromoteConfirmId(null);
                     setPromoteError('');
                   }}
@@ -811,7 +826,7 @@ export default function MembersPage() {
                 <h2>{addMode === 'existing' ? 'Add Existing Member' : 'New Member'}</h2>
               </div>
 
-              {!canViewAllBranches && myBranch && feederBranch && (
+              {(canViewAllBranches || (myBranch && feederBranch)) && (
                 <div className="tab-switch" style={{ marginBottom: 16 }}>
                   <button
                     type="button"
@@ -830,59 +845,96 @@ export default function MembersPage() {
                 </div>
               )}
 
-              {addMode === 'existing' && !canViewAllBranches && myBranch && feederBranch ? (
+              {addMode === 'existing' && (canViewAllBranches || (myBranch && feederBranch)) ? (
                 <div>
-                  <p style={{ fontSize: 13, color: '#76716c', marginBottom: 12 }}>
-                    Search {branchLabel(feederBranch)} for a member who's ready to move up into {branchLabel(myBranch)}. They keep their same record — attendance history and details included.
-                  </p>
-                  <input
-                    className="search-input"
-                    type="text"
-                    placeholder={`Search ${branchLabel(feederBranch)} by name...`}
-                    value={existingSearch}
-                    onChange={e => setExistingSearch(e.target.value)}
-                    autoFocus
-                  />
-                  {promoteError && <p className="form-error">{promoteError}</p>}
-                  <div className="attendance-history" style={{ marginTop: 12 }}>
-                    {matchingIncoming.length === 0 ? (
-                      <p className="history-empty">
-                        {existingSearch ? 'No matches found.' : `No members currently in ${branchLabel(feederBranch)}.`}
+                  {canViewAllBranches ? (
+                    <>
+                      <p style={{ fontSize: 13, color: '#76716c', marginBottom: 12 }}>
+                        Move a member up to the next branch in their progression. They keep their same record — attendance history and details included.
                       </p>
-                    ) : matchingIncoming.map(m => (
-                      <div className="attendance-row" key={m.id}>
-                        <span>{m.first_name} {m.last_name} · {calculateAge(m.date_of_birth)}y</span>
-                        {promoteConfirmId === m.id ? (
-                          <span style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                            <button
-                              type="button"
-                              className="button button--primary button--small"
-                              disabled={promotingId === m.id}
-                              onClick={() => handlePromote(m)}
-                            >
-                              {promotingId === m.id ? 'Adding...' : 'Confirm'}
-                            </button>
+                      <div className="form-grid" style={{ marginBottom: 12 }}>
+                        <label>
+                          Move members up from
+                          <select
+                            className="select"
+                            value={existingSourceBranch}
+                            onChange={e => setExistingSourceBranch(e.target.value as Branch | '')}
+                          >
+                            <option value="">Select branch...</option>
+                            {BRANCHES.filter(b => NEXT_BRANCH[b.value]).map(b => (
+                              <option key={b.value} value={b.value}>{b.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        {existingSourceBranch && (
+                          <div>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#4a4540' }}>Moving into</span>
+                            <p style={{ fontSize: 15, fontWeight: 700, marginTop: 6 }}>
+                              {branchLabel(NEXT_BRANCH[existingSourceBranch]!)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <p style={{ fontSize: 13, color: '#76716c', marginBottom: 12 }}>
+                      Search {branchLabel(feederBranch!)} for a member who's ready to move up into {branchLabel(myBranch!)}. They keep their same record — attendance history and details included.
+                    </p>
+                  )}
+
+                  {promoteSourceBranch && (
+                    <input
+                      className="search-input"
+                      type="text"
+                      placeholder={`Search ${branchLabel(promoteSourceBranch)} by name...`}
+                      value={existingSearch}
+                      onChange={e => setExistingSearch(e.target.value)}
+                      autoFocus={!canViewAllBranches}
+                    />
+                  )}
+                  {promoteError && <p className="form-error">{promoteError}</p>}
+                  {promoteSourceBranch && (
+                    <div className="attendance-history" style={{ marginTop: 12 }}>
+                      {matchingIncoming.length === 0 ? (
+                        <p className="history-empty">
+                          {existingSearch ? 'No matches found.' : `No members currently in ${branchLabel(promoteSourceBranch)}.`}
+                        </p>
+                      ) : matchingIncoming.map(m => (
+                        <div className="attendance-row" key={m.id}>
+                          <span>{m.first_name} {m.last_name} · {calculateAge(m.date_of_birth)}y</span>
+                          {promoteConfirmId === m.id ? (
+                            <span style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                              <button
+                                type="button"
+                                className="button button--primary button--small"
+                                disabled={promotingId === m.id || (canViewAllBranches && !promoteTargetBranch)}
+                                onClick={() => handlePromote(m)}
+                              >
+                                {promotingId === m.id ? 'Adding...' : 'Confirm'}
+                              </button>
+                              <button
+                                type="button"
+                                className="button button--secondary button--small"
+                                disabled={promotingId === m.id}
+                                onClick={() => setPromoteConfirmId(null)}
+                              >
+                                Cancel
+                              </button>
+                            </span>
+                          ) : (
                             <button
                               type="button"
                               className="button button--secondary button--small"
-                              disabled={promotingId === m.id}
-                              onClick={() => setPromoteConfirmId(null)}
+                              disabled={canViewAllBranches && !promoteTargetBranch}
+                              onClick={() => setPromoteConfirmId(m.id)}
                             >
-                              Cancel
+                              {promoteTargetBranch ? `Add to ${branchLabel(promoteTargetBranch)}` : 'Choose a branch above'}
                             </button>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            className="button button--secondary button--small"
-                            onClick={() => setPromoteConfirmId(m.id)}
-                          >
-                            Add to {branchLabel(myBranch)}
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
               <form onSubmit={handleAddMember}>
