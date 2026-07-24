@@ -9,6 +9,7 @@ import { MEMBER_ACCESS_ROLES } from '@/lib/members';
 const links = [
   { href: '/', label: 'Home' },
   { href: '/contact', label: 'Contact' },
+  { href: '/notes', label: 'Notes' },
 ];
 
 type NotificationRow = {

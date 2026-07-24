@@ -35,6 +35,8 @@ p { color: #4a4540; }
 .panel.accent-green  { border-top: 4px solid #2a7a2a; }
 .panel.accent-orange { border-top: 4px solid #d46b00; }
 .panel.accent-gold   { border-top: 4px solid #b8960c; }
+.panel.accent-gray   { border-top: 4px solid #5a5550; }
+.panel.accent-blue   { border-top: 4px solid #1e3a5f; }
 
 /* ── EYEBROW ── */
 .eyebrow {
@@ -136,6 +138,8 @@ label {
 
 @media (max-width: 640px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .note-card__header { flex-direction: column; }
+  .note-card__actions { justify-content: flex-start; width: 100%; }
 }
 
 /* ── SECTION HEADER ── */
@@ -531,6 +535,47 @@ tbody tr:hover { background: #faf8f6; }
 .form-card__header { margin-bottom: 20px; }
 .form-card__header h2 { font-size: 18px; margin-bottom: 4px; }
 .form-card__header p  { font-size: 13px; color: #76716c; }
+
+/* ── MEETING NOTES ── */
+.note-card { padding: 20px 24px; margin-bottom: 16px; }
+
+.note-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.note-card__title { font-size: 17px; margin-top: 2px; }
+
+.note-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.note-card__content {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #2c2825;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  margin-top: 12px;
+}
+
+.note-card__content--clickable { cursor: pointer; }
+
+.note-card__meta {
+  font-size: 12px;
+  color: #a39d96;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #f0ece8;
+}
 
 .contact-form-card form {
   display: flex;

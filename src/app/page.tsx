@@ -16,13 +16,13 @@ const features: Feature[] = [
   {
     href: '/inventory/intendant',
     title: 'Intendant',
-    accent: 'accent-orange',
+    accent: 'accent-gray',
     emoji: '🍳',
   },
   {
     href: '/inventory/materiel',
     title: 'Gérant de Matériel',
-    accent: 'accent-green',
+    accent: 'accent-gray',
     emoji: '🎒',
   },
 ];
@@ -71,13 +71,18 @@ export default function Home() {
           </Link>
         )}
 
+        <Link href="/notes" className="landing-card panel accent-blue">
+          <span className="landing-card__emoji">📝</span>
+          <h2 className="landing-card__title">Meeting Notes</h2>
+        </Link>
+
         <Link href="/contact" className="landing-card panel accent-red landing-card--contact">
           <span className="landing-card__emoji">📬</span>
           <h2 className="landing-card__title">Contact</h2>
         </Link>
 
         {isCG && (
-          <Link href="/admin" className="landing-card panel accent-red landing-card--contact">
+          <Link href="/admin" className="landing-card panel accent-gold landing-card--contact">
             <span className="landing-card__emoji">⚙️</span>
             <h2 className="landing-card__title">Admin</h2>
           </Link>
