@@ -48,7 +48,16 @@ type AttendanceRow = {
   member_id: string;
   meeting_date: string;
   present: boolean;
+  session_type: 'meeting' | 'camp' | 'journee';
 };
+
+const SESSION_TYPES: { value: 'meeting' | 'camp' | 'journee'; label: string }[] = [
+  { value: 'meeting', label: 'Réunion' },
+  { value: 'camp', label: 'Camp' },
+  { value: 'journee', label: 'Journée' },
+];
+
+const sessionTypeLabel = (type?: string) => SESSION_TYPES.find(t => t.value === type)?.label ?? 'Réunion';
 
 type MemberFormState = {
   first_name: string;
@@ -86,6 +95,8 @@ const formatSessionDate = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 
 function AttendanceSummary({ rows, loading, editedDates }: { rows: AttendanceRow[]; loading: boolean; editedDates?: Set<string> }) {
+  const [typeFilter, setTypeFilter] = useState<'all' | 'meeting' | 'camp' | 'journee'>('all');
+
   if (loading) {
     return (
       <div className="attendance-history">
@@ -99,39 +110,74 @@ function AttendanceSummary({ rows, loading, editedDates }: { rows: AttendanceRow
     );
   }
 
-  const total = rows.length;
-  const present = rows.filter(r => r.present).length;
-  const pct = total > 0 ? Math.round((present / total) * 100) : 0;
-
-  if (total === 0) {
+  if (rows.length === 0) {
     return <p className="history-empty">No attendance recorded yet.</p>;
   }
 
+  // Camp/Journée sessions still show up in the list below, but only
+  // Réunion sessions count toward the attendance rate.
+  const meetingRows = rows.filter(r => (r.session_type ?? 'meeting') === 'meeting');
+  const total = meetingRows.length;
+  const present = meetingRows.filter(r => r.present).length;
+  const pct = total > 0 ? Math.round((present / total) * 100) : 0;
+
+  const visibleRows = typeFilter === 'all' ? rows : rows.filter(r => (r.session_type ?? 'meeting') === typeFilter);
+
+  const showStats = typeFilter === 'all' || typeFilter === 'meeting';
+
   return (
     <>
-      <div className="attendance-summary">
-        <div className="attendance-summary__stat">
-          <span className="attendance-summary__value">{present}/{total}</span>
-          <span className="attendance-summary__label">Sessions Attended</span>
-        </div>
-        <div className="attendance-summary__stat">
-          <span className="attendance-summary__value">{pct}%</span>
-          <span className="attendance-summary__label">Attendance Rate</span>
-        </div>
-      </div>
-      <div className="attendance-history">
-        {rows.map(row => (
-          <div className="attendance-row" key={row.id}>
-            <span>
-              {formatSessionDate(row.meeting_date)}
-              {editedDates?.has(row.meeting_date) && <span className="edited-badge">Edited</span>}
-            </span>
-            <span className={`history-action history-action--${row.present ? 'in' : 'out'}`}>
-              {row.present ? 'Present' : 'Absent'}
-            </span>
+      {showStats && (
+        <div className="attendance-summary">
+          <div className="attendance-summary__stat">
+            <span className="attendance-summary__value">{present}/{total}</span>
+            <span className="attendance-summary__label">Sessions Attended</span>
           </div>
+          <div className="attendance-summary__stat">
+            <span className="attendance-summary__value">{pct}%</span>
+            <span className="attendance-summary__label">Attendance Rate</span>
+          </div>
+        </div>
+      )}
+
+      <div className="tab-switch" style={{ marginBottom: 12 }}>
+        <button
+          type="button"
+          className={`tab-switch__item ${typeFilter === 'all' ? 'tab-switch__item--active' : ''}`}
+          onClick={() => setTypeFilter('all')}
+        >
+          All
+        </button>
+        {SESSION_TYPES.map(t => (
+          <button
+            key={t.value}
+            type="button"
+            className={`tab-switch__item ${typeFilter === t.value ? 'tab-switch__item--active' : ''}`}
+            onClick={() => setTypeFilter(t.value)}
+          >
+            {t.label}
+          </button>
         ))}
       </div>
+
+      {visibleRows.length === 0 ? (
+        <p className="history-empty">No sessions of this type yet.</p>
+      ) : (
+        <div className="attendance-history">
+          {visibleRows.map(row => (
+            <div className="attendance-row" key={row.id}>
+              <span>
+                {formatSessionDate(row.meeting_date)}
+                <span className="attendance-row__branch"> · {sessionTypeLabel(row.session_type)}</span>
+                {editedDates?.has(row.meeting_date) && <span className="edited-badge">Edited</span>}
+              </span>
+              <span className={`history-action history-action--${row.present ? 'in' : 'out'}`}>
+                {row.present ? 'Present' : 'Absent'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
@@ -177,7 +223,8 @@ export default function MembersPage() {
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [attendanceSuccess, setAttendanceSuccess] = useState('');
-  const [pastSessions, setPastSessions] = useState<string[]>([]);
+  const [pastSessions, setPastSessions] = useState<{ meeting_date: string; session_type: string }[]>([]);
+  const [attendanceSessionType, setAttendanceSessionType] = useState<'meeting' | 'camp' | 'journee'>('meeting');
   const [sessionAlreadySaved, setSessionAlreadySaved] = useState(false);
 
   const [historyBranch, setHistoryBranch] = useState<Branch | ''>('');
@@ -388,10 +435,17 @@ export default function MembersPage() {
   const fetchPastSessions = async () => {
     const { data } = await supabase
       .from('attendance')
-      .select('meeting_date')
+      .select('meeting_date, session_type')
       .order('meeting_date', { ascending: false });
 
-    const unique = Array.from(new Set(((data as { meeting_date: string }[]) ?? []).map(r => r.meeting_date)));
+    const seen = new Set<string>();
+    const unique: { meeting_date: string; session_type: string }[] = [];
+    ((data as { meeting_date: string; session_type: string }[]) ?? []).forEach(r => {
+      if (!seen.has(r.meeting_date)) {
+        seen.add(r.meeting_date);
+        unique.push(r);
+      }
+    });
     setPastSessions(unique);
   };
 
@@ -420,6 +474,7 @@ export default function MembersPage() {
     setAttendanceMap(map);
     setAttendanceMapOriginal(map);
     setSessionAlreadySaved(rows.length > 0);
+    setAttendanceSessionType(rows.length > 0 ? rows[0].session_type : 'meeting');
     setAttendanceLoading(false);
   };
 
@@ -449,6 +504,7 @@ export default function MembersPage() {
       meeting_date: attendanceDate,
       present: Boolean(attendanceMap[m.id]),
       marked_by: currentUserId,
+      session_type: attendanceSessionType,
     }));
 
     const { error } = await supabase
@@ -681,15 +737,17 @@ export default function MembersPage() {
 
     supabase
       .from('attendance')
-      .select('member_id, present')
+      .select('member_id, present, session_type')
       .in('member_id', memberIds)
       .then(({ data }) => {
         const stats: Record<string, { total: number; present: number }> = {};
-        ((data as { member_id: string; present: boolean }[]) ?? []).forEach(row => {
-          if (!stats[row.member_id]) stats[row.member_id] = { total: 0, present: 0 };
-          stats[row.member_id].total += 1;
-          if (row.present) stats[row.member_id].present += 1;
-        });
+        ((data as { member_id: string; present: boolean; session_type: string }[]) ?? [])
+          .filter(row => (row.session_type ?? 'meeting') === 'meeting')
+          .forEach(row => {
+            if (!stats[row.member_id]) stats[row.member_id] = { total: 0, present: 0 };
+            stats[row.member_id].total += 1;
+            if (row.present) stats[row.member_id].present += 1;
+          });
         setHistoryStats(stats);
         setHistoryStatsLoading(false);
       });
@@ -1234,6 +1292,19 @@ export default function MembersPage() {
                   {BRANCHES.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
                 </select>
               )}
+              <div className="tab-switch">
+                {SESSION_TYPES.map(t => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    className={`tab-switch__item ${attendanceSessionType === t.value ? 'tab-switch__item--active' : ''}`}
+                    onClick={() => setAttendanceSessionType(t.value)}
+                    disabled={attendanceLocked}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -1248,14 +1319,14 @@ export default function MembersPage() {
 
           {pastSessions.length > 0 && (
             <div className="session-picker">
-              {pastSessions.map(date => (
+              {pastSessions.map(s => (
                 <button
-                  key={date}
+                  key={s.meeting_date}
                   type="button"
-                  className={`session-chip ${date === attendanceDate ? 'session-chip--active' : ''}`}
-                  onClick={() => setAttendanceDate(date)}
+                  className={`session-chip ${s.meeting_date === attendanceDate ? 'session-chip--active' : ''}`}
+                  onClick={() => setAttendanceDate(s.meeting_date)}
                 >
-                  {formatSessionDate(date)}
+                  {formatSessionDate(s.meeting_date)} · {sessionTypeLabel(s.session_type)}
                 </button>
               ))}
             </div>
