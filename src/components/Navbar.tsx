@@ -10,6 +10,7 @@ const links = [
   { href: '/', label: 'Home' },
   { href: '/contact', label: 'Contact' },
   { href: '/notes', label: 'Notes' },
+  { href: '/timetree', label: 'TimeTree' },
 ];
 
 type NotificationRow = {

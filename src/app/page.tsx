@@ -76,6 +76,11 @@ export default function Home() {
           <h2 className="landing-card__title">Meeting Notes</h2>
         </Link>
 
+        <Link href="/timetree" className="landing-card panel accent-green">
+          <span className="landing-card__emoji">📅</span>
+          <h2 className="landing-card__title">TimeTree</h2>
+        </Link>
+
         <Link href="/contact" className="landing-card panel accent-red landing-card--contact">
           <span className="landing-card__emoji">📬</span>
           <h2 className="landing-card__title">Contact</h2>
