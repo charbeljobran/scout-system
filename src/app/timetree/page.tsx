@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from 'react';
 
-// TimeTree doesn't publish an official custom URL scheme, so this is a
-// best-effort guess.
-const TIMETREE_SCHEME = 'timetree://';
+// TimeTree doesn't use a custom URL scheme — it uses Universal Links on its
+// own short-link domain, timetr.ee (confirmed from a real share link:
+// https://timetr.ee/s/<code>). The phone's OS matches on the domain + path
+// shape alone to decide whether to hand off to the installed app, before it
+// even checks whether the code resolves to anything real — so a made-up
+// placeholder code still triggers the app-open handoff, without risking
+// inviting anyone to a real calendar the way a genuine invite link would.
+const TIMETREE_APP_LINK = 'https://timetr.ee/s/open';
 
 // market:// forces Android to open the native Play Store app. The plain
 // https://play.google.com/... link often opens as a browser page instead.
@@ -39,9 +44,7 @@ export default function TimeTreeRedirectPage() {
               Tap below to open TimeTree. If nothing happens (it's probably not installed yet),
               tap "{storeLabel}" instead.
             </p>
-            {/* Real anchor taps, not a JS-timed redirect — mobile browsers
-                block non-http navigation that isn't tied to a direct tap. */}
-            <a href={TIMETREE_SCHEME} className="button button--primary" style={{ display: 'inline-block', marginBottom: 12 }}>
+            <a href={TIMETREE_APP_LINK} className="button button--primary" style={{ display: 'inline-block', marginBottom: 12 }}>
               Open TimeTree
             </a>
             <br />
