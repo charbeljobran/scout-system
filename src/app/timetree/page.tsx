@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 
-// TimeTree doesn't use a custom URL scheme — it uses Universal Links /
-// App Links on its own short-link domain, timetr.ee (confirmed from a real
-// share link: https://timetr.ee/s/<code>). A placeholder code still
-// triggers the app-open handoff without risking inviting anyone to a real
-// calendar the way a genuine invite link would.
+// TimeTree's own generic "download/open the app" link, taken directly from
+// the text of a real invitation email — this is NOT invite-specific, it's
+// the same permanent link TimeTree includes in every invite for exactly
+// this purpose, so it won't hit an "invalid/expired invitation" wall the
+// way a fake invite-shaped link does.
 const TIMETREE_HOST = 'timetr.ee';
-const TIMETREE_PATH = '/s/open';
+const TIMETREE_PATH = '/dl';
 const TIMETREE_APP_LINK = `https://${TIMETREE_HOST}${TIMETREE_PATH}`;
 
 const PLAY_STORE_PACKAGE = 'works.jubilee.timetree';
