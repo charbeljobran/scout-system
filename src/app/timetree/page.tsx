@@ -2,20 +2,30 @@
 
 import { useEffect, useState } from 'react';
 
-// TimeTree doesn't use a custom URL scheme — it uses Universal Links on its
-// own short-link domain, timetr.ee (confirmed from a real share link:
-// https://timetr.ee/s/<code>). The phone's OS matches on the domain + path
-// shape alone to decide whether to hand off to the installed app, before it
-// even checks whether the code resolves to anything real — so a made-up
-// placeholder code still triggers the app-open handoff, without risking
-// inviting anyone to a real calendar the way a genuine invite link would.
-const TIMETREE_APP_LINK = 'https://timetr.ee/s/open';
+// TimeTree doesn't use a custom URL scheme — it uses Universal Links /
+// App Links on its own short-link domain, timetr.ee (confirmed from a real
+// share link: https://timetr.ee/s/<code>). A placeholder code still
+// triggers the app-open handoff without risking inviting anyone to a real
+// calendar the way a genuine invite link would.
+const TIMETREE_HOST = 'timetr.ee';
+const TIMETREE_PATH = '/s/open';
+const TIMETREE_APP_LINK = `https://${TIMETREE_HOST}${TIMETREE_PATH}`;
 
-// market:// forces Android to open the native Play Store app. The plain
-// https://play.google.com/... link often opens as a browser page instead.
-const PLAY_STORE_APP_URL = 'market://details?id=works.jubilee.timetree';
+const PLAY_STORE_PACKAGE = 'works.jubilee.timetree';
+const PLAY_STORE_WEB_URL = `https://play.google.com/store/apps/details?id=${PLAY_STORE_PACKAGE}`;
+const PLAY_STORE_APP_URL = `market://details?id=${PLAY_STORE_PACKAGE}`;
 const APP_STORE_URL = 'https://apps.apple.com/app/apple-store/id952578473?pt=111449809&ct=promoweb&mt=8';
 const WEB_URL = 'https://timetreeapp.com/intl/en';
+
+// Android's plain https tap doesn't reliably hand off to the app the way
+// iOS's Universal Links do — the digital-asset-link verification Android
+// requires is stricter and easy for it to silently fail. An intent:// URL
+// is the standard, more reliable way to ask Android "open whichever app is
+// registered for this domain, and only fall back to the browser if it truly
+// isn't installed" instead of relying on that verification succeeding.
+const ANDROID_INTENT_URL =
+  `intent://${TIMETREE_HOST}${TIMETREE_PATH}#Intent;scheme=https;package=${PLAY_STORE_PACKAGE};` +
+  `S.browser_fallback_url=${encodeURIComponent(PLAY_STORE_WEB_URL)};end`;
 
 export default function TimeTreeRedirectPage() {
   const [platform, setPlatform] = useState<'ios' | 'android' | 'other' | null>(null);
@@ -27,6 +37,7 @@ export default function TimeTreeRedirectPage() {
     else setPlatform('other');
   }, []);
 
+  const openLink = platform === 'android' ? ANDROID_INTENT_URL : TIMETREE_APP_LINK;
   const storeUrl = platform === 'ios' ? APP_STORE_URL : PLAY_STORE_APP_URL;
   const storeLabel = platform === 'ios' ? 'Open in App Store' : 'Open in Play Store';
 
@@ -44,7 +55,7 @@ export default function TimeTreeRedirectPage() {
               Tap below to open TimeTree. If nothing happens (it's probably not installed yet),
               tap "{storeLabel}" instead.
             </p>
-            <a href={TIMETREE_APP_LINK} className="button button--primary" style={{ display: 'inline-block', marginBottom: 12 }}>
+            <a href={openLink} className="button button--primary" style={{ display: 'inline-block', marginBottom: 12 }}>
               Open TimeTree
             </a>
             <br />
