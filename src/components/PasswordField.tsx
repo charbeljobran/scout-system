@@ -36,7 +36,7 @@ export default function PasswordField({
         className={className}
         // paddingRight always wins here (spread last) so there's guaranteed
         // room for the peek icon, no matter what base style is passed in.
-        style={{ ...style, paddingRight: 38 }}
+        style={{ ...style, paddingRight: 44 }}
         autoComplete={autoComplete}
         required={required}
         onKeyDown={onKeyDown}
@@ -48,7 +48,7 @@ export default function PasswordField({
         aria-label={visible ? 'Hide password' : 'Show password'}
         tabIndex={-1}
       >
-        {visible ? '🔒' : '🔓'}
+        {visible ? '🔓' : '🔒'}
       </button>
     </div>
   );

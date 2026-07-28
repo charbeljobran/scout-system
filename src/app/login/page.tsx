@@ -39,10 +39,10 @@ export default function Login() {
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <img src="/sdlmwm-logo.jpg" alt="Scout Du Liban" width="64" height="64" style={{ marginBottom: '12px' }} />
           <h1 style={{ fontSize: '22px', marginBottom: '4px' }}>Scout Inventory</h1>
-          <p style={{ fontSize: '13px', color: '#76716c' }}>Sign in to access the inventory</p>
+          <p style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Sign in to access the inventory</p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: '700' }}>
             Email
             <input
@@ -51,7 +51,7 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
               required
-              style={{ padding: '9px 12px', border: '1px solid #d8d1ca', borderRadius: '8px', fontSize: '14px', outline: 'none', background: '#f5f3f0' }}
+              style={{ padding: '9px 12px', border: '1px solid var(--color-border)', borderRadius: '8px', fontSize: '14px', outline: 'none', background: 'var(--color-bg)' }}
             />
           </label>
 
@@ -63,23 +63,21 @@ export default function Login() {
               placeholder="Enter your password"
               required
               autoComplete="current-password"
-              style={{ padding: '9px 12px', border: '1px solid #d8d1ca', borderRadius: '8px', fontSize: '14px', outline: 'none', background: '#f5f3f0' }}
+              style={{ padding: '9px 12px', border: '1px solid var(--color-border)', borderRadius: '8px', fontSize: '14px', outline: 'none', background: 'var(--color-bg)' }}
             />
           </label>
 
-          {error && (
-            <p style={{ color: '#cc2222', fontSize: '13px', fontWeight: '600' }}>{error}</p>
-          )}
+          {error && <p className="form-error">{error}</p>}
 
           <button
             className="button button--primary"
-            onClick={handleSubmit}
+            type="submit"
             disabled={loading}
             style={{ width: '100%' }}
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
-        </div>
+        </form>
       </div>
     </main>
   );
