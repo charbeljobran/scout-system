@@ -206,6 +206,7 @@ export default function MembersPage() {
   const [dobError, setDobError] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [exportNotice, setExportNotice] = useState('');
 
   const [viewingMember, setViewingMember] = useState<MemberRow | null>(null);
   const [editForm, setEditForm] = useState<MemberFormState | null>(null);
@@ -361,9 +362,10 @@ export default function MembersPage() {
 
   const handleExportExcel = async () => {
     if (filteredMembers.length === 0) {
-      window.alert('No members to export.');
+      setExportNotice('No members to export.');
       return;
     }
+    setExportNotice('');
 
     const XLSX = await import('xlsx');
 
@@ -859,6 +861,7 @@ export default function MembersPage() {
               <button className="button button--secondary" type="button" onClick={handleExportExcel}>
                 Export to Excel
               </button>
+              {exportNotice && <span className="form-error" style={{ marginBottom: 0 }}>{exportNotice}</span>}
               {canAddMember && (
                 <button
                   className="button button--primary"

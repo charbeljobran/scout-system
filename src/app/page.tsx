@@ -30,12 +30,16 @@ const features: Feature[] = [
 export default function Home() {
   const [isCG, setIsCG] = useState(false);
   const [canAccessMembers, setCanAccessMembers] = useState(false);
+  const [roleChecked, setRoleChecked] = useState(false);
 
   useEffect(() => {
     const checkRole = async () => {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
-      if (!userId) return;
+      if (!userId) {
+        setRoleChecked(true);
+        return;
+      }
 
       const { data } = await supabase
         .from('user_roles')
@@ -44,6 +48,7 @@ export default function Home() {
         .single();
       setIsCG(data?.role === 'cg');
       setCanAccessMembers(MEMBER_ACCESS_ROLES.includes(data?.role ?? ''));
+      setRoleChecked(true);
     };
     checkRole();
   }, []);
@@ -64,8 +69,15 @@ export default function Home() {
           </Link>
         ))}
 
-        {canAccessMembers && (
-          <Link href="/members" className="landing-card panel accent-red">
+        {!roleChecked && (
+          <>
+            <div className="landing-card--skeleton skeleton" aria-hidden="true" />
+            <div className="landing-card--skeleton skeleton" aria-hidden="true" />
+          </>
+        )}
+
+        {roleChecked && canAccessMembers && (
+          <Link href="/members" className="landing-card panel accent-orange">
             <span className="landing-card__emoji">🧑‍🤝‍🧑</span>
             <h2 className="landing-card__title">Members</h2>
           </Link>
@@ -77,6 +89,7 @@ export default function Home() {
         </Link>
 
         <Link href="/timetree" className="landing-card panel accent-green">
+          <span className="landing-card__external" aria-hidden="true">↗</span>
           <span className="landing-card__emoji">📅</span>
           <h2 className="landing-card__title">TimeTree</h2>
         </Link>
@@ -86,7 +99,7 @@ export default function Home() {
           <h2 className="landing-card__title">Contact</h2>
         </Link>
 
-        {isCG && (
+        {roleChecked && isCG && (
           <Link href="/admin" className="landing-card panel accent-gold landing-card--contact">
             <span className="landing-card__emoji">⚙️</span>
             <h2 className="landing-card__title">Admin</h2>

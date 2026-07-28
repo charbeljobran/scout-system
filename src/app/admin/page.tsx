@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 type UserEntry = {
   id: string;
@@ -22,6 +23,7 @@ export default function AdminPage() {
   const [newPassword, setNewPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [mfaSaving, setMfaSaving] = useState(false);
+  const [pendingMfaReset, setPendingMfaReset] = useState<UserEntry | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -102,9 +104,14 @@ export default function AdminPage() {
     }
   };
 
-  const handleResetMfa = async (user: UserEntry) => {
-    const confirmed = window.confirm(`Reset 2FA for ${user.email}? They will need to set it up again on next login.`);
-    if (!confirmed) return;
+  const handleResetMfa = (user: UserEntry) => {
+    setPendingMfaReset(user);
+  };
+
+  const confirmResetMfa = async () => {
+    const user = pendingMfaReset;
+    setPendingMfaReset(null);
+    if (!user) return;
 
     setMfaResettingId(user.id);
     setMfaSaving(true);
@@ -165,17 +172,9 @@ export default function AdminPage() {
         <h1 style={{ fontSize: '24px', fontWeight: '800', marginTop: '4px' }}>User Management</h1>
       </div>
 
-      {error && (
-        <div style={{ background: '#fde8e8', border: '1px solid #f0c0c0', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
-          <p style={{ color: '#8b1a1a', fontSize: '13px', fontWeight: '600' }}>{error}</p>
-        </div>
-      )}
+      {error && <div className="banner banner--error">{error}</div>}
 
-      {success && (
-        <div style={{ background: '#d4edda', border: '1px solid #b8ddc4', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
-          <p style={{ color: '#1a5c2a', fontSize: '13px', fontWeight: '600' }}>{success}</p>
-        </div>
-      )}
+      {success && <div className="banner banner--success">{success}</div>}
 
       <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e8e3de', borderTop: '4px solid #cc2222', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
@@ -250,6 +249,16 @@ export default function AdminPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingMfaReset)}
+        title="Reset 2FA"
+        message={`Reset 2FA for ${pendingMfaReset?.email}? They will need to set it up again on next login.`}
+        confirmLabel="Reset 2FA"
+        danger
+        onConfirm={confirmResetMfa}
+        onCancel={() => setPendingMfaReset(null)}
+      />
 
     </main>
   );

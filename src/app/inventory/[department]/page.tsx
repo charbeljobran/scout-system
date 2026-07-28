@@ -3,6 +3,7 @@
 import type { FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import StatusBadge from '@/components/StatusBadge';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import {
   departmentCategories,
   getStatus,
@@ -164,6 +165,7 @@ export default function DepartmentInventory() {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [showActivityLog, setShowActivityLog] = useState(false);
+  const [pendingDeleteItem, setPendingDeleteItem] = useState<InventoryItem | null>(null);
   const [activityLog, setActivityLog] = useState<HistoryRow[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityUserFilter, setActivityUserFilter] = useState('');
@@ -334,8 +336,14 @@ export default function DepartmentInventory() {
     setActivityUserFilter('');
   };
 
-  const handleDeleteItem = async (item: InventoryItem) => {
-    if (!confirm(`Delete "${item.name}" completely? This cannot be undone.`)) return;
+  const handleDeleteItem = (item: InventoryItem) => {
+    setPendingDeleteItem(item);
+  };
+
+  const confirmDeleteItem = async () => {
+    const item = pendingDeleteItem;
+    setPendingDeleteItem(null);
+    if (!item) return;
     const { error } = await supabase.from('items').delete().eq('id', item.id);
     if (!error) {
       setItems(prev => prev.filter(i => i.id !== item.id));
@@ -1052,6 +1060,16 @@ export default function DepartmentInventory() {
           <p className="empty-state">No items to show.</p>
         )}
       </section>
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteItem)}
+        title="Delete item"
+        message={`Delete "${pendingDeleteItem?.name}" completely? This cannot be undone.`}
+        confirmLabel="Delete"
+        danger
+        onConfirm={confirmDeleteItem}
+        onCancel={() => setPendingDeleteItem(null)}
+      />
 
     </main>
   );
