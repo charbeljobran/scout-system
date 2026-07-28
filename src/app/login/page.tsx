@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import PasswordField from '@/components/PasswordField';
 
 export default function Login() {
   const router = useRouter();
@@ -56,12 +57,12 @@ export default function Login() {
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: '700' }}>
             Password
-            <input
-              type="password"
+            <PasswordField
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
               placeholder="Enter your password"
               required
+              autoComplete="current-password"
               style={{ padding: '9px 12px', border: '1px solid #d8d1ca', borderRadius: '8px', fontSize: '14px', outline: 'none', background: '#f5f3f0' }}
             />
           </label>

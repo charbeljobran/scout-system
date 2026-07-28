@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import PasswordField from '@/components/PasswordField';
 
 type UserEntry = {
   id: string;
@@ -21,6 +22,7 @@ export default function AdminPage() {
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [mfaResettingId, setMfaResettingId] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [mfaSaving, setMfaSaving] = useState(false);
   const [pendingMfaReset, setPendingMfaReset] = useState<UserEntry | null>(null);
@@ -65,6 +67,11 @@ export default function AdminPage() {
       return;
     }
 
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
     setSaving(true);
     setError('');
     setSuccess('');
@@ -96,6 +103,7 @@ export default function AdminPage() {
         setSuccess(`Password reset successfully for ${user.email}.`);
         setResettingId(null);
         setNewPassword('');
+        setConfirmPassword('');
       }
     } catch {
       setError('Network error — could not reach the server.');
@@ -198,11 +206,27 @@ export default function AdminPage() {
                   <td style={{ padding: '12px 16px' }}>
                     {resettingId === user.id ? (
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <input
-                          type="password"
+                        <PasswordField
                           placeholder="New password"
                           value={newPassword}
-                          onChange={e => setNewPassword(e.target.value)}
+                          onChange={setNewPassword}
+                          autoComplete="new-password"
+                          onKeyDown={e => { if (e.key === 'Enter') handleResetPassword(user); }}
+                          style={{
+                            padding: '5px 10px',
+                            border: '1px solid #d8d1ca',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            width: '160px',
+                            background: '#f5f3f0',
+                            outline: 'none',
+                          }}
+                        />
+                        <PasswordField
+                          placeholder="Confirm password"
+                          value={confirmPassword}
+                          onChange={setConfirmPassword}
+                          autoComplete="new-password"
                           onKeyDown={e => { if (e.key === 'Enter') handleResetPassword(user); }}
                           style={{
                             padding: '5px 10px',
@@ -225,7 +249,7 @@ export default function AdminPage() {
                         <button
                           className="table-action table-action--muted"
                           type="button"
-                          onClick={() => { setResettingId(null); setNewPassword(''); setError(''); }}
+                          onClick={() => { setResettingId(null); setNewPassword(''); setConfirmPassword(''); setError(''); }}
                         >
                           Cancel
                         </button>
@@ -235,7 +259,7 @@ export default function AdminPage() {
                         <button
                           className="table-action"
                           type="button"
-                          onClick={() => { setResettingId(user.id); setNewPassword(''); setSuccess(''); setError(''); }}
+                          onClick={() => { setResettingId(user.id); setNewPassword(''); setConfirmPassword(''); setSuccess(''); setError(''); }}
                         >
                           Reset Password
                         </button>

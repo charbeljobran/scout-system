@@ -1322,6 +1322,31 @@ th { color: var(--color-surface); }
   color: #1a5c2a;
 }
 
+/* ── PASSWORD FIELD ── */
+.password-field {
+  position: relative;
+  display: inline-flex;
+  width: 100%;
+}
+
+.password-field input { width: 100%; }
+
+.password-field__toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+.password-field__toggle:hover { background: var(--color-surface-muted); }
+
 /* ── CONFIRM DIALOG ── */
 .confirm-overlay {
   position: fixed;
