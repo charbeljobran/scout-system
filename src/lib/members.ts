@@ -36,7 +36,7 @@ export const ROLE_TO_BRANCH: Record<string, Branch> = {
   eclaireurs: 'eclaireurs',
   eclaireuses: 'eclaireuses',
   pionnieres: 'pionnieres',
-  routier: 'routiers',
+  routiers: 'routiers',
 };
 
 // The branch each branch feeds into as members age up. Terminal branches

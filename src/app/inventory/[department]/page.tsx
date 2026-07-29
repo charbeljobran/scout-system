@@ -164,10 +164,12 @@ export default function DepartmentInventory() {
   const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [pendingDeleteItem, setPendingDeleteItem] = useState<InventoryItem | null>(null);
   const [activityLog, setActivityLog] = useState<HistoryRow[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState('');
   const [activityUserFilter, setActivityUserFilter] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [userRole, setUserRole] = useState<UserRole>('viewer');
@@ -204,10 +206,12 @@ export default function DepartmentInventory() {
         setItems((itemData as ItemRow[]).map(toInventoryItem));
 
         if (email) {
-          const { data: usageData } = await supabase
+          const { data: usageData, error: usageError } = await supabase
             .from('item_usage')
             .select('*')
             .eq('user_email', email);
+
+          if (usageError) { setError('Could not load your in-use quantities.'); return; }
 
           const usageMap: Record<number, number> = {};
           (usageData as ItemUsageRow[] ?? []).forEach(u => {
@@ -296,17 +300,23 @@ export default function DepartmentInventory() {
   const openHistory = async (item: InventoryItem) => {
     setHistoryItem(item);
     setHistoryLoading(true);
-    const { data } = await supabase
+    setHistoryError('');
+    const { data, error } = await supabase
       .from('history')
       .select('*')
       .eq('item_id', item.id)
       .order('created_at', { ascending: false })
       .limit(50);
+    if (error) {
+      setHistoryError('Could not load item history.');
+      setHistoryLoading(false);
+      return;
+    }
     setHistory((data as HistoryRow[]) ?? []);
     setHistoryLoading(false);
   };
 
-  const closeHistory = () => { setHistoryItem(null); setHistory([]); };
+  const closeHistory = () => { setHistoryItem(null); setHistory([]); setHistoryError(''); };
 
   const isAnyHistoryModalOpen = Boolean(historyItem) || showActivityLog;
 
@@ -320,12 +330,18 @@ export default function DepartmentInventory() {
   const openActivityLog = async () => {
     setShowActivityLog(true);
     setActivityLoading(true);
-    const { data } = await supabase
+    setActivityError('');
+    const { data, error } = await supabase
       .from('history')
       .select('*')
       .in('category', categories)
       .order('created_at', { ascending: false })
       .limit(200);
+    if (error) {
+      setActivityError('Could not load the activity log.');
+      setActivityLoading(false);
+      return;
+    }
     setActivityLog((data as HistoryRow[]) ?? []);
     setActivityLoading(false);
   };
@@ -333,6 +349,7 @@ export default function DepartmentInventory() {
   const closeActivityLog = () => {
     setShowActivityLog(false);
     setActivityLog([]);
+    setActivityError('');
     setActivityUserFilter('');
   };
 
@@ -713,7 +730,9 @@ export default function DepartmentInventory() {
               <button className="history-close" type="button" onClick={closeHistory}>✕</button>
             </div>
             <div className="history-modal__body">
-              {historyLoading ? (
+              {historyError ? (
+                <p className="form-error">{historyError}</p>
+              ) : historyLoading ? (
                 <table className="history-table">
                   <thead>
                     <tr>
@@ -792,7 +811,9 @@ export default function DepartmentInventory() {
               </span>
             </div>
             <div className="history-modal__body">
-              {activityLoading ? (
+              {activityError ? (
+                <p className="form-error">{activityError}</p>
+              ) : activityLoading ? (
                 <>
                   <div className="activity-table-wrap">
                     <table className="history-table">

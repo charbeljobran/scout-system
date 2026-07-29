@@ -53,6 +53,7 @@ export default function NotesPage() {
   const [form, setForm] = useState<NoteFormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<NoteFormState>(emptyForm);
@@ -72,11 +73,17 @@ export default function NotesPage() {
   }, [viewingNote]);
 
   const fetchNotes = async () => {
-    const { data } = await supabase
+    const { data, error: fetchError } = await supabase
       .from('meeting_notes')
       .select('*')
       .order('meeting_date', { ascending: false })
       .order('created_at', { ascending: false });
+
+    if (fetchError) {
+      setLoadError('Could not load meeting notes. Check your connection and try again.');
+      return;
+    }
+    setLoadError('');
     setNotes((data as NoteRow[]) ?? []);
   };
 
@@ -210,8 +217,10 @@ export default function NotesPage() {
         )}
       </div>
 
+      {loadError && <div className="banner banner--error">{loadError}</div>}
+
       {!canWrite && (
-        <p style={{ color: '#76716c', fontSize: 13, marginBottom: 16 }}>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 13, marginBottom: 16 }}>
         </p>
       )}
 

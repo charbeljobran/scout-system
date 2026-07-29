@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import {
   BRANCHES,
   Branch,
@@ -206,6 +207,7 @@ export default function MembersPage() {
   const [dobError, setDobError] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [exportNotice, setExportNotice] = useState('');
 
   const [viewingMember, setViewingMember] = useState<MemberRow | null>(null);
@@ -217,13 +219,12 @@ export default function MembersPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [attendanceDate, setAttendanceDate] = useState(todayIso());
-  const [attendanceDateInput, setAttendanceDateInput] = useState(isoToDMY(todayIso()));
-  const [dateError, setDateError] = useState('');
   const [attendanceMap, setAttendanceMap] = useState<Record<string, boolean>>({});
   const [attendanceMapOriginal, setAttendanceMapOriginal] = useState<Record<string, boolean>>({});
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [attendanceSuccess, setAttendanceSuccess] = useState('');
+  const [attendanceError, setAttendanceError] = useState('');
   const [pastSessions, setPastSessions] = useState<{ meeting_date: string; session_type: string }[]>([]);
   const [attendanceSessionType, setAttendanceSessionType] = useState<'meeting' | 'camp' | 'journee'>('meeting');
   const [sessionAlreadySaved, setSessionAlreadySaved] = useState(false);
@@ -231,11 +232,13 @@ export default function MembersPage() {
   const [historyBranch, setHistoryBranch] = useState<Branch | ''>('');
   const [historyStats, setHistoryStats] = useState<Record<string, { total: number; present: number }>>({});
   const [historyStatsLoading, setHistoryStatsLoading] = useState(false);
+  const [historyStatsError, setHistoryStatsError] = useState('');
 
   const [lookupMember, setLookupMember] = useState<MemberRow | null>(null);
   const [lookupRows, setLookupRows] = useState<AttendanceRow[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupEditedDates, setLookupEditedDates] = useState<Set<string>>(new Set());
+  const [lookupError, setLookupError] = useState('');
 
   const [promoteConfirmId, setPromoteConfirmId] = useState<string | null>(null);
   const [promotingId, setPromotingId] = useState<string | null>(null);
@@ -292,7 +295,12 @@ export default function MembersPage() {
       .select('*')
       .order('last_name', { ascending: true });
 
-    if (!error) setMembers((data as MemberRow[]) ?? []);
+    if (error) {
+      setLoadError('Could not load members. Check your connection and try again.');
+      return;
+    }
+    setLoadError('');
+    setMembers((data as MemberRow[]) ?? []);
   };
 
   // Everyone this account should treat as "their" roster — everyone for
@@ -412,33 +420,18 @@ export default function MembersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, attendanceDate, ready, attendanceRoster.length]);
 
-  useEffect(() => {
-    setAttendanceDateInput(isoToDMY(attendanceDate));
-    setDateError('');
-  }, [attendanceDate]);
-
-  const commitAttendanceDate = (rawValue?: string) => {
-    const parsed = parseDMY(rawValue ?? attendanceDateInput);
-
-    if (!parsed) {
-      setDateError('Enter a valid date as DD/MM/YYYY.');
-      return;
-    }
-
-    if (parsed > todayIso()) {
-      setDateError("You can't select a date in the future.");
-      return;
-    }
-
-    setDateError('');
-    setAttendanceDate(parsed);
-  };
 
   const fetchPastSessions = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('attendance')
       .select('meeting_date, session_type')
       .order('meeting_date', { ascending: false });
+
+    if (error) {
+      setAttendanceError('Could not load past sessions.');
+      return;
+    }
+    setAttendanceError('');
 
     const seen = new Set<string>();
     const unique: { meeting_date: string; session_type: string }[] = [];
@@ -464,11 +457,18 @@ export default function MembersPage() {
       return;
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('attendance')
       .select('*')
       .eq('meeting_date', date)
       .in('member_id', memberIds);
+
+    if (error) {
+      setAttendanceError('Could not load attendance for this date.');
+      setAttendanceLoading(false);
+      return;
+    }
+    setAttendanceError('');
 
     const rows = (data as AttendanceRow[]) ?? [];
     const map: Record<string, boolean> = {};
@@ -487,6 +487,45 @@ export default function MembersPage() {
   const attendanceReadOnlyRole = !canMarkAttendance;
   const attendanceLocked = attendanceReadOnlyRole;
   const isLeaderEdit = sessionAlreadySaved && !isCgUser && !isSecretaire;
+
+  const eligibleAttendanceRoster = useMemo(
+    () => attendanceRoster.filter(m => isEligibleForDate(m, attendanceDate)),
+    [attendanceRoster, attendanceDate],
+  );
+
+  const presentCount = eligibleAttendanceRoster.filter(m => Boolean(attendanceMap[m.id])).length;
+
+  const hasUnsavedAttendanceChanges = eligibleAttendanceRoster.some(
+    m => Boolean(attendanceMap[m.id]) !== Boolean(attendanceMapOriginal[m.id]),
+  );
+
+  const [pendingAttendanceNav, setPendingAttendanceNav] = useState<(() => void) | null>(null);
+
+  const guardAttendanceNav = (action: () => void) => {
+    if (tab === 'attendance' && hasUnsavedAttendanceChanges) {
+      setPendingAttendanceNav(() => action);
+    } else {
+      action();
+    }
+  };
+
+  const markAllPresent = () => {
+    if (attendanceLocked) return;
+    setAttendanceMap(prev => {
+      const next = { ...prev };
+      eligibleAttendanceRoster.forEach(m => { next[m.id] = true; });
+      return next;
+    });
+  };
+
+  const clearAllAttendance = () => {
+    if (attendanceLocked) return;
+    setAttendanceMap(prev => {
+      const next = { ...prev };
+      eligibleAttendanceRoster.forEach(m => { next[m.id] = false; });
+      return next;
+    });
+  };
 
   const togglePresent = (memberId: string) => {
     if (attendanceLocked) return;
@@ -731,17 +770,24 @@ export default function MembersPage() {
 
     if (historyRoster.length === 0) {
       setHistoryStats({});
+      setHistoryStatsError('');
       return;
     }
 
     setHistoryStatsLoading(true);
+    setHistoryStatsError('');
     const memberIds = historyRoster.map(m => m.id);
 
     supabase
       .from('attendance')
       .select('member_id, present, session_type')
       .in('member_id', memberIds)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          setHistoryStatsError('Could not load attendance history.');
+          setHistoryStatsLoading(false);
+          return;
+        }
         const stats: Record<string, { total: number; present: number }> = {};
         ((data as { member_id: string; present: boolean; session_type: string }[]) ?? [])
           .filter(row => (row.session_type ?? 'meeting') === 'meeting')
@@ -758,10 +804,16 @@ export default function MembersPage() {
   const openLookup = async (member: MemberRow) => {
     setLookupMember(member);
     setLookupLoading(true);
-    const [{ data }, { data: editData }] = await Promise.all([
+    setLookupError('');
+    const [{ data, error: attendanceErr }, { data: editData, error: editErr }] = await Promise.all([
       supabase.from('attendance').select('*').eq('member_id', member.id).order('meeting_date', { ascending: false }),
       supabase.from('attendance_edit_events').select('meeting_date').eq('member_id', member.id),
     ]);
+    if (attendanceErr || editErr) {
+      setLookupError('Could not load attendance history.');
+      setLookupLoading(false);
+      return;
+    }
     setLookupRows((data as AttendanceRow[]) ?? []);
     setLookupEditedDates(new Set(((editData as { meeting_date: string }[]) ?? []).map(r => r.meeting_date)));
     setLookupLoading(false);
@@ -771,6 +823,7 @@ export default function MembersPage() {
     setLookupMember(null);
     setLookupRows([]);
     setLookupEditedDates(new Set());
+    setLookupError('');
   };
 
   const isAnyModalOpen = Boolean(viewingMember) || Boolean(lookupMember);
@@ -819,7 +872,7 @@ export default function MembersPage() {
             <button
               type="button"
               className={`tab-switch__item ${tab === 'members' ? 'tab-switch__item--active' : ''}`}
-              onClick={() => setTab('members')}
+              onClick={() => guardAttendanceNav(() => setTab('members'))}
             >
               Members
             </button>
@@ -833,7 +886,7 @@ export default function MembersPage() {
             <button
               type="button"
               className={`tab-switch__item ${tab === 'history' ? 'tab-switch__item--active' : ''}`}
-              onClick={() => setTab('history')}
+              onClick={() => guardAttendanceNav(() => setTab('history'))}
             >
               History
             </button>
@@ -843,6 +896,7 @@ export default function MembersPage() {
 
       {tab === 'members' && (
         <>
+          {loadError && <div className="banner banner--error">{loadError}</div>}
           <div className="section-header section-header--wrap">
             <div className="toolbar">
               <input
@@ -1268,23 +1322,19 @@ export default function MembersPage() {
               <div className="date-field">
                 <input
                   className="search-input"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={10}
-                  placeholder="DD/MM/YYYY"
-                  value={attendanceDateInput}
+                  type="date"
+                  max={todayIso()}
+                  value={attendanceDate}
                   onChange={e => {
-                    const masked = maskDateInput(e.target.value);
-                    setAttendanceDateInput(masked);
-                    if (masked.length === 10) commitAttendanceDate(masked);
+                    const next = e.target.value;
+                    if (!next) return;
+                    guardAttendanceNav(() => setAttendanceDate(next));
                   }}
-                  onBlur={() => commitAttendanceDate()}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitAttendanceDate(); } }}
                 />
                 <button
                   type="button"
                   className="button button--secondary button--small"
-                  onClick={() => setAttendanceDate(todayIso())}
+                  onClick={() => guardAttendanceNav(() => setAttendanceDate(todayIso()))}
                 >
                   Today
                 </button>
@@ -1311,12 +1361,13 @@ export default function MembersPage() {
             </div>
           </div>
 
-          {dateError && <p className="form-error">{dateError}</p>}
+          {attendanceError && <p className="form-error">{attendanceError}</p>}
           {attendanceSuccess && <p className="form-success">{attendanceSuccess}</p>}
           {attendanceReadOnlyRole ? (
             <p className="form-warning">You have view-only access to attendance.</p>
           ) : isLeaderEdit && (
             <p className="form-warning">
+              This session was already recorded. Your changes will be logged and CG will be notified.
             </p>
           )}
 
@@ -1327,11 +1378,29 @@ export default function MembersPage() {
                   key={s.meeting_date}
                   type="button"
                   className={`session-chip ${s.meeting_date === attendanceDate ? 'session-chip--active' : ''}`}
-                  onClick={() => setAttendanceDate(s.meeting_date)}
+                  onClick={() => guardAttendanceNav(() => setAttendanceDate(s.meeting_date))}
                 >
                   {formatSessionDate(s.meeting_date)} · {sessionTypeLabel(s.session_type)}
                 </button>
               ))}
+            </div>
+          )}
+
+          {attendanceRoster.length > 0 && !attendanceLoading && (
+            <div className="attendance-bulk-bar">
+              <span className="attendance-count">
+                {presentCount} / {eligibleAttendanceRoster.length} present
+              </span>
+              {!attendanceReadOnlyRole && (
+                <div className="attendance-bulk-actions">
+                  <button type="button" className="button button--secondary button--small" onClick={markAllPresent} disabled={attendanceLocked}>
+                    Mark All Present
+                  </button>
+                  <button type="button" className="button button--secondary button--small" onClick={clearAllAttendance} disabled={attendanceLocked}>
+                    Clear All
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1382,6 +1451,20 @@ export default function MembersPage() {
               </button>
             </div>
           )}
+
+          <ConfirmDialog
+            open={Boolean(pendingAttendanceNav)}
+            title="Discard unsaved attendance?"
+            message="You have unsaved attendance changes for this date. Leaving now will discard them."
+            confirmLabel="Discard changes"
+            danger
+            onConfirm={() => {
+              const action = pendingAttendanceNav;
+              setPendingAttendanceNav(null);
+              action?.();
+            }}
+            onCancel={() => setPendingAttendanceNav(null)}
+          />
         </>
       )}
 
@@ -1402,6 +1485,8 @@ export default function MembersPage() {
               )}
             </div>
           </div>
+
+          {historyStatsError && <div className="banner banner--error">{historyStatsError}</div>}
 
           <section className="panel accent-red attendance-list" aria-label="Attendance history">
             {!historyBranch ? (
@@ -1656,7 +1741,11 @@ export default function MembersPage() {
               <button className="history-close" type="button" onClick={closeLookup}>✕</button>
             </div>
             <div className="history-modal__body">
-              <AttendanceSummary rows={lookupRows} loading={lookupLoading} editedDates={lookupEditedDates} />
+              {lookupError ? (
+                <p className="form-error">{lookupError}</p>
+              ) : (
+                <AttendanceSummary rows={lookupRows} loading={lookupLoading} editedDates={lookupEditedDates} />
+              )}
             </div>
           </div>
         </div>
