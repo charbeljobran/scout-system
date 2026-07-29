@@ -696,11 +696,11 @@ export default function MembersPage() {
   };
 
   const canEditViewingMember = viewingMember
-    ? (isCgUser || isSecretaire || viewingMember.added_by === currentUserId)
+    ? (isCgUser || isSecretaire || viewingMember.added_by === currentUserId || viewingMember.branch === myBranch)
     : false;
 
   const canDeleteViewingMember = viewingMember
-    ? (isCgUser || isSecretaire || viewingMember.added_by === currentUserId)
+    ? (isCgUser || isSecretaire || viewingMember.added_by === currentUserId || viewingMember.branch === myBranch)
     : false;
 
   const handleUpdateMember = async (e: React.FormEvent) => {

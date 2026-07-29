@@ -19,7 +19,7 @@ using (
       and (
         ur.role in ('cg', 'secretaire')
         or ur.role = members.branch
-        or (ur.role = 'routier' and members.branch = 'routiers')
+        or (ur.role = 'routiers' and members.branch = 'routiers')
       )
   )
 );
@@ -68,7 +68,7 @@ with check (
       and (
         ur.role in ('cg', 'secretaire')
         or ur.role = members.branch
-        or (ur.role = 'routier' and members.branch = 'routiers')
+        or (ur.role = 'routiers' and members.branch = 'routiers')
       )
   )
 );
@@ -106,7 +106,7 @@ using (
       and (
         ur.role in ('cg', 'secretaire')
         or ur.role = m.branch
-        or (ur.role = 'routier' and m.branch = 'routiers')
+        or (ur.role = 'routiers' and m.branch = 'routiers')
       )
   )
 );
@@ -127,7 +127,7 @@ with check (
       and (
         ur.role in ('cg', 'secretaire')
         or ur.role = m.branch
-        or (ur.role = 'routier' and m.branch = 'routiers')
+        or (ur.role = 'routiers' and m.branch = 'routiers')
       )
   )
 );
@@ -147,7 +147,7 @@ using (
       and (
         ur.role in ('cg', 'secretaire')
         or ur.role = m.branch
-        or (ur.role = 'routier' and m.branch = 'routiers')
+        or (ur.role = 'routiers' and m.branch = 'routiers')
       )
   )
 )
@@ -161,7 +161,7 @@ with check (
       and (
         ur.role in ('cg', 'secretaire')
         or ur.role = m.branch
-        or (ur.role = 'routier' and m.branch = 'routiers')
+        or (ur.role = 'routiers' and m.branch = 'routiers')
       )
   )
 );
