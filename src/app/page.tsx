@@ -4,26 +4,30 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MEMBER_ACCESS_ROLES } from '@/lib/members';
+import { KitchenIcon, GearBagIcon, PeopleIcon, NotesIcon, CalendarIcon, MailIcon, GearAdminIcon } from '@/components/icons/ScoutIcons';
 
 type Feature = {
   href: string;
   title: string;
+  desc: string;
   accent: string;
-  emoji: string;
+  icon: React.ComponentType<{ className?: string }>;
 };
 
 const features: Feature[] = [
   {
     href: '/inventory/intendant',
     title: 'Intendant',
+    desc: 'Kitchen & food stock',
     accent: 'accent-gray',
-    emoji: '🍳',
+    icon: KitchenIcon,
   },
   {
     href: '/inventory/materiel',
     title: 'Gérant de Matériel',
+    desc: 'Gear & equipment',
     accent: 'accent-gray',
-    emoji: '🎒',
+    icon: GearBagIcon,
   },
 ];
 
@@ -56,7 +60,9 @@ export default function Home() {
   return (
     <main className="landing-shell">
       <div className="landing-header">
-        <img src="/sdlmwm-logo.jpg" alt="Scout Du Liban" width="72" height="72" />
+        <span className="landing-header__badge">
+          <img src="/sdlmwm-logo.jpg" alt="Scout Du Liban" width="72" height="72" />
+        </span>
         <h1>Scout Inventory</h1>
         <p>Select a section to get started</p>
       </div>
@@ -64,8 +70,9 @@ export default function Home() {
       <div className="landing-grid">
         {features.map((feature) => (
           <Link key={feature.href} href={feature.href} className={`landing-card panel ${feature.accent}`}>
-            <span className="landing-card__emoji">{feature.emoji}</span>
+            <feature.icon className="landing-card__icon" />
             <h2 className="landing-card__title">{feature.title}</h2>
+            <p className="landing-card__desc">{feature.desc}</p>
           </Link>
         ))}
 
@@ -78,31 +85,36 @@ export default function Home() {
 
         {roleChecked && canAccessMembers && (
           <Link href="/members" className="landing-card panel accent-orange">
-            <span className="landing-card__emoji">🧑‍🤝‍🧑</span>
+            <PeopleIcon className="landing-card__icon" />
             <h2 className="landing-card__title">Members</h2>
+            <p className="landing-card__desc">Roster & attendance</p>
           </Link>
         )}
 
         <Link href="/notes" className="landing-card panel accent-blue">
-          <span className="landing-card__emoji">📝</span>
+          <NotesIcon className="landing-card__icon" />
           <h2 className="landing-card__title">Meeting Notes</h2>
+          <p className="landing-card__desc">Agendas & minutes</p>
         </Link>
 
         <Link href="/timetree" className="landing-card panel accent-green">
           <span className="landing-card__external" aria-hidden="true">↗</span>
-          <span className="landing-card__emoji">📅</span>
+          <CalendarIcon className="landing-card__icon" />
           <h2 className="landing-card__title">TimeTree</h2>
+          <p className="landing-card__desc">Shared calendar</p>
         </Link>
 
         <Link href="/contact" className="landing-card panel accent-red landing-card--contact">
-          <span className="landing-card__emoji">📬</span>
+          <MailIcon className="landing-card__icon" />
           <h2 className="landing-card__title">Contact</h2>
+          <p className="landing-card__desc">Reach the team</p>
         </Link>
 
         {roleChecked && isCG && (
           <Link href="/admin" className="landing-card panel accent-gold landing-card--contact">
-            <span className="landing-card__emoji">⚙️</span>
+            <GearAdminIcon className="landing-card__icon" />
             <h2 className="landing-card__title">Admin</h2>
+            <p className="landing-card__desc">Manage accounts & access</p>
           </Link>
         )}
       </div>

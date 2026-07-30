@@ -1,40 +1,52 @@
 /* ── DESIGN TOKENS ── */
+/* Canvas/khaki base with an oxblood brand red and forest/brass accents —
+   pulled toward the org's own crest color rather than a generic admin palette. */
+@import url('https://fonts.googleapis.com/css2?family=Fjalla+One&family=Inter:wght@400;500;600;700;800&display=swap');
+
 :root {
-  --color-text: #1a1a1a;
-  --color-text-muted: #76716c;
-  --color-text-secondary: #4a4540;
-  --color-text-faint: #a8a29b;
+  --color-text: #23261f;
+  --color-text-muted: #7b7359;
+  --color-text-secondary: #423e2f;
+  --color-text-faint: #a89d80;
 
-  --color-brand: #cc2222;
-  --color-danger: #8b1a1a;
+  --color-brand: #ad272b;
+  --color-danger: #7a1717;
 
-  --color-bg: #f5f3f0;
-  --color-surface: #ffffff;
-  --color-surface-muted: #f0ece8;
+  --color-bg: #f2efe3;
+  --color-surface: #fffdf7;
+  --color-surface-muted: #eae3cd;
 
-  --color-border: #d8d1ca;
-  --color-border-light: #e8e3de;
+  --color-border: #d9d0b3;
+  --color-border-light: #e8e1cb;
 
-  --color-accent-red: #cc2222;
-  --color-accent-green: #2a7a2a;
-  --color-accent-orange: #d46b00;
-  --color-accent-gold: #b8960c;
-  --color-accent-gray: #5a5550;
-  --color-accent-blue: #1e3a5f;
+  --color-accent-red: #ad272b;
+  --color-accent-green: #33532f;
+  --color-accent-orange: #a85a1c;
+  --color-accent-gold: #93701f;
+  --color-accent-gray: #55503f;
+  --color-accent-blue: #223c52;
+
+  --font-display: 'Fjalla One', 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* ── RESET & BASE ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-body);
   font-size: 14px;
   color: var(--color-text);
   background: var(--color-bg);
   line-height: 1.5;
 }
 
-h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+}
 p { color: var(--color-text-secondary); }
 
 /* ── APP SHELL ── */
@@ -65,12 +77,15 @@ p { color: var(--color-text-secondary); }
 
 /* ── EYEBROW ── */
 .eyebrow {
+  display: inline-block;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--color-text-muted);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px dashed var(--color-border);
 }
 
 /* ── BUTTONS ── */
@@ -636,36 +651,58 @@ tbody tr:hover { background: #faf8f6; }
   margin-bottom: 40px;
 }
 
-.landing-header img { object-fit: contain; margin-bottom: 16px; }
-.landing-header h1  { font-size: 28px; font-weight: 800; color: var(--color-brand); margin-bottom: 8px; }
-.landing-header p   { font-size: 14px; color: var(--color-text-muted); }
+/* Logo sits inside a dashed "patch" ring, echoing a scout badge rather
+   than a plain square app icon. */
+.landing-header__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--color-border);
+  padding: 8px;
+  margin-bottom: 18px;
+  background: var(--color-surface);
+}
+
+.landing-header img { object-fit: contain; border-radius: 50%; }
+.landing-header h1  {
+  font-size: 30px;
+  color: var(--color-brand);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.landing-header p   { font-size: 13px; color: var(--color-text-muted); }
 
 .landing-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  gap: 14px;
   width: 100%;
-  max-width: 600px;
+  max-width: 640px;
 }
 
 .landing-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
+  align-items: flex-start;
+  justify-content: flex-end;
+  text-align: left;
   text-decoration: none;
-  padding: 32px 24px;
-  border-radius: 12px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  min-height: 160px;
+  padding: 20px;
+  border-radius: 10px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  min-height: 148px;
+  border-style: solid;
 }
 
 .landing-card__external {
   position: absolute;
-  top: 12px;
-  right: 14px;
+  top: 14px;
+  right: 16px;
   font-size: 13px;
   font-weight: 700;
   color: var(--color-text-faint);
@@ -673,12 +710,27 @@ tbody tr:hover { background: #faf8f6; }
 
 .landing-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  box-shadow: 0 10px 22px rgba(35, 38, 31, 0.12);
 }
 
-.landing-card__emoji { font-size: 32px; margin-bottom: 12px; }
-.landing-card__title { font-size: 16px; font-weight: 700; color: var(--color-text); margin-bottom: 6px; }
-.landing-card__desc  { font-size: 13px; color: var(--color-text-muted); line-height: 1.5; }
+.landing-card__icon {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 22px;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.landing-card__title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 17px;
+  letter-spacing: 0.01em;
+  color: var(--color-text);
+  margin-bottom: 3px;
+}
+
+.landing-card__desc  { font-size: 12px; color: var(--color-text-muted); line-height: 1.4; }
 
 .landing-card--contact { grid-column: 1 / -1; }
 
