@@ -35,15 +35,15 @@ export default function Login() {
 
   return (
     <main className="landing-shell">
-      <div className="panel accent-red" style={{ width: '100%', maxWidth: '420px', padding: '32px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <img src="/sdlmwm-logo.jpg" alt="Scout Du Liban" width="64" height="64" style={{ marginBottom: '12px' }} />
-          <h1 style={{ fontSize: '22px', marginBottom: '4px' }}>Scout Inventory</h1>
-          <p style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Sign in to access the inventory</p>
+      <section className="panel accent-red auth-panel">
+        <div className="auth-panel__header">
+          <img src="/sdlmwm-logo.jpg" alt="Scout Du Liban" width="64" height="64" />
+          <h1>Scout Inventory</h1>
+          <p>Sign in to access the inventory</p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: '700' }}>
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <label>
             Email
             <input
               type="email"
@@ -51,11 +51,10 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
               required
-              style={{ padding: '9px 12px', border: '1px solid var(--color-border)', borderRadius: '8px', fontSize: '14px', outline: 'none', background: 'var(--color-bg)' }}
             />
           </label>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: '700' }}>
+          <label>
             Password
             <PasswordField
               value={password}
@@ -63,7 +62,6 @@ export default function Login() {
               placeholder="Enter your password"
               required
               autoComplete="current-password"
-              style={{ padding: '9px 12px', border: '1px solid var(--color-border)', borderRadius: '8px', fontSize: '14px', outline: 'none', background: 'var(--color-bg)' }}
             />
           </label>
 
@@ -78,7 +76,7 @@ export default function Login() {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-      </div>
+      </section>
     </main>
   );
 }

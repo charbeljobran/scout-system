@@ -69,7 +69,6 @@ export default function Home() {
           <Link key={feature.href} href={feature.href} className={`landing-card panel ${feature.accent}`}>
             <feature.icon className="landing-card__icon" />
             <h2 className="landing-card__title">{feature.title}</h2>
-            
           </Link>
         ))}
 

@@ -964,7 +964,7 @@ export default function MembersPage() {
                 <div>
                   {canViewAllBranches ? (
                     <>
-                      <p style={{ fontSize: 13, color: '#76716c', marginBottom: 12 }}>
+                      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 12 }}>
                         Move a member up to the next branch in their progression. They keep their same record — attendance history and details included.
                       </p>
                       <div className="form-grid" style={{ marginBottom: 12 }}>
@@ -983,7 +983,7 @@ export default function MembersPage() {
                         </label>
                         {existingSourceBranch && (
                           <div>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: '#4a4540' }}>Moving into</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }}>Moving into</span>
                             <p style={{ fontSize: 15, fontWeight: 700, marginTop: 6 }}>
                               {branchLabel(NEXT_BRANCH[existingSourceBranch]!)}
                             </p>
@@ -992,7 +992,7 @@ export default function MembersPage() {
                       </div>
                     </>
                   ) : (
-                    <p style={{ fontSize: 13, color: '#76716c', marginBottom: 12 }}>
+                    <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 12 }}>
                       Search {branchLabel(feederBranch!)} for a member who's ready to move up into {branchLabel(myBranch!)}. They keep their same record — attendance history and details included.
                     </p>
                   )}

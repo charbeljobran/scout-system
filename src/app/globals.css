@@ -21,8 +21,8 @@
 
   --color-accent-red: #ad272b;
   --color-accent-green: #33532f;
-  --color-accent-orange: #fb7100;
-  --color-accent-gold: #93701f;
+  --color-accent-orange: #ff7300;
+  --color-accent-gold: #c98e03;
   --color-accent-gray: #55503f;
   --color-accent-blue: #223c52;
 
@@ -750,7 +750,14 @@ tbody tr:hover { background: #faf8f6; }
   margin-bottom: 24px;
 }
 
-.auth-panel__header img { margin-bottom: 12px; }
+.auth-panel__header img {
+  margin-bottom: 14px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--color-border);
+  padding: 8px;
+  background: var(--color-surface);
+  object-fit: contain;
+}
 .auth-panel__header h1 { font-size: 22px; margin-bottom: 6px; }
 .auth-panel__header p { font-size: 13px; color: var(--color-text-muted); }
 

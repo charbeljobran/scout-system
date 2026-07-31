@@ -168,7 +168,7 @@ export default function AdminPage() {
 
   if (!ready) return (
     <main className="page-shell">
-      <p style={{ textAlign: 'center', color: '#888', padding: '40px' }}>Loading...</p>
+      <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '40px' }}>Loading...</p>
     </main>
   );
 
@@ -184,25 +184,25 @@ export default function AdminPage() {
 
       {success && <div className="banner banner--success">{success}</div>}
 
-      <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e8e3de', borderTop: '4px solid #cc2222', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--color-surface)', borderRadius: '12px', border: '1px solid var(--color-border-light)', borderTop: '4px solid var(--color-brand)', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead style={{ background: '#cc2222' }}>
+            <thead style={{ background: 'var(--color-brand)' }}>
               <tr>
-                <th style={{ padding: '10px 16px', textAlign: 'left', color: '#ffffff', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</th>
-                <th style={{ padding: '10px 16px', textAlign: 'left', color: '#ffffff', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Actions</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', color: 'var(--color-surface)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', color: 'var(--color-surface)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={2} style={{ textAlign: 'center', padding: '40px', color: '#76716c', fontStyle: 'italic' }}>
+                  <td colSpan={2} style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
                     No users found.
                   </td>
                 </tr>
               ) : users.map((user, index) => (
-                <tr key={user.id} style={{ borderTop: index === 0 ? 'none' : '1px solid #f0ece8' }}>
-                  <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1a1a1a' }}>{user.email}</td>
+                <tr key={user.id} style={{ borderTop: index === 0 ? 'none' : '1px solid var(--color-border-light)' }}>
+                  <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--color-text)' }}>{user.email}</td>
                   <td style={{ padding: '12px 16px' }}>
                     {resettingId === user.id ? (
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -214,11 +214,11 @@ export default function AdminPage() {
                           onKeyDown={e => { if (e.key === 'Enter') handleResetPassword(user); }}
                           style={{
                             padding: '5px 10px',
-                            border: '1px solid #d8d1ca',
+                            border: '1px solid var(--color-border)',
                             borderRadius: '6px',
                             fontSize: '13px',
                             width: '160px',
-                            background: '#f5f3f0',
+                            background: 'var(--color-bg)',
                             outline: 'none',
                           }}
                         />
@@ -230,11 +230,11 @@ export default function AdminPage() {
                           onKeyDown={e => { if (e.key === 'Enter') handleResetPassword(user); }}
                           style={{
                             padding: '5px 10px',
-                            border: '1px solid #d8d1ca',
+                            border: '1px solid var(--color-border)',
                             borderRadius: '6px',
                             fontSize: '13px',
                             width: '160px',
-                            background: '#f5f3f0',
+                            background: 'var(--color-bg)',
                             outline: 'none',
                           }}
                         />

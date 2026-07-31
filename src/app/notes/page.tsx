@@ -192,7 +192,7 @@ export default function NotesPage() {
           <h1>Meeting Notes</h1>
         </div>
         <section className="panel accent-red" aria-label="Meeting notes loading">
-          <p style={{ color: '#76716c' }}>Loading...</p>
+          <p style={{ color: 'var(--color-text-muted)' }}>Loading...</p>
         </section>
       </main>
     );
@@ -270,11 +270,11 @@ export default function NotesPage() {
 
       {loading ? (
         <section className="panel accent-red" aria-label="Meeting notes loading">
-          <p style={{ color: '#76716c' }}>Loading notes...</p>
+          <p style={{ color: 'var(--color-text-muted)' }}>Loading notes...</p>
         </section>
       ) : notes.length === 0 ? (
         <section className="panel accent-red" aria-label="No meeting notes">
-          <p style={{ color: '#76716c' }}>No meeting notes yet.</p>
+          <p style={{ color: 'var(--color-text-muted)' }}>No meeting notes yet.</p>
         </section>
       ) : (
         notes.map(note => (

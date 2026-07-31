@@ -56,7 +56,7 @@ export default function TimeTreeRedirectPage() {
 
         {(platform === 'ios' || platform === 'android') ? (
           <>
-            <p style={{ color: '#76716c', marginBottom: 20 }}>
+            <p style={{ color: 'var(--color-text-muted)', marginBottom: 20 }}>
               Tap below to open TimeTree. If nothing happens (it's probably not installed yet),
               tap "{storeLabel}" instead.
             </p>
@@ -69,13 +69,13 @@ export default function TimeTreeRedirectPage() {
             </a>
           </>
         ) : (
-          <p style={{ color: '#76716c', marginBottom: 20 }}>
+          <p style={{ color: 'var(--color-text-muted)', marginBottom: 20 }}>
             TimeTree doesn't have a desktop app — open it in your browser instead.
           </p>
         )}
 
         <p style={{ marginTop: 20 }}>
-          <a href={WEB_URL} style={{ color: '#1e3a5f', fontSize: 13 }}>Or open TimeTree's website</a>
+          <a href={WEB_URL} style={{ color: 'var(--color-accent-blue)', fontSize: 13 }}>Or open TimeTree's website</a>
         </p>
       </section>
     </main>
