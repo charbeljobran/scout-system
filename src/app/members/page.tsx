@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import { CloseIcon } from '@/components/icons/ScoutIcons';
 import {
   BRANCHES,
   Branch,
@@ -1363,13 +1364,7 @@ export default function MembersPage() {
 
           {attendanceError && <p className="form-error">{attendanceError}</p>}
           {attendanceSuccess && <p className="form-success">{attendanceSuccess}</p>}
-          {attendanceReadOnlyRole ? (
-            <p className="form-warning">You have view-only access to attendance.</p>
-          ) : isLeaderEdit && (
-            <p className="form-warning">
-              This session was already recorded. Your changes will be logged and CG will be notified.
-            </p>
-          )}
+          
 
           {pastSessions.length > 0 && (
             <div className="session-picker">
@@ -1526,7 +1521,7 @@ export default function MembersPage() {
                 <p className="eyebrow">Member</p>
                 <h2>{viewingMember.first_name} {viewingMember.last_name}</h2>
               </div>
-              <button className="history-close" type="button" onClick={closeMember}>✕</button>
+              <button className="history-close" type="button" onClick={closeMember} aria-label="Close"><CloseIcon className="history-close__icon" /></button>
             </div>
             <div className="history-modal__body">
               {editError && <p className="form-error">{editError}</p>}
@@ -1738,7 +1733,7 @@ export default function MembersPage() {
                 <p className="eyebrow">Attendance History</p>
                 <h2>{lookupMember.first_name} {lookupMember.last_name}</h2>
               </div>
-              <button className="history-close" type="button" onClick={closeLookup}>✕</button>
+              <button className="history-close" type="button" onClick={closeLookup} aria-label="Close"><CloseIcon className="history-close__icon" /></button>
             </div>
             <div className="history-modal__body">
               {lookupError ? (

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MEMBER_ACCESS_ROLES } from '@/lib/members';
+import { BellIcon, CloseIcon } from '@/components/icons/ScoutIcons';
 
 const links = [
   { href: '/', label: 'Home' },
@@ -190,7 +191,7 @@ export default function Navbar() {
                   onClick={handleToggleNotifications}
                   aria-label="Attendance edit notifications"
                 >
-                  🔔
+                  <BellIcon className="notif-bell__icon" />
                   {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
                 </button>
                 {showNotifications && (
@@ -204,7 +205,7 @@ export default function Navbar() {
                           onClick={() => setShowNotifications(false)}
                           aria-label="Close"
                         >
-                          ✕
+                          <CloseIcon className="history-close__icon" />
                         </button>
                       </div>
                       <div className="notif-modal__body">

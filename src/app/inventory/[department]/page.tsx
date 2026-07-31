@@ -4,6 +4,7 @@ import type { FormEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import { CloseIcon } from '@/components/icons/ScoutIcons';
 import {
   departmentCategories,
   getStatus,
@@ -727,7 +728,7 @@ export default function DepartmentInventory() {
                 <p className="eyebrow">History</p>
                 <h2>{historyItem.name}</h2>
               </div>
-              <button className="history-close" type="button" onClick={closeHistory}>✕</button>
+              <button className="history-close" type="button" onClick={closeHistory} aria-label="Close"><CloseIcon className="history-close__icon" /></button>
             </div>
             <div className="history-modal__body">
               {historyError ? (
@@ -790,7 +791,7 @@ export default function DepartmentInventory() {
                 <p className="eyebrow">Activity Log</p>
                 <h2>{label}</h2>
               </div>
-              <button className="history-close" type="button" onClick={closeActivityLog}>✕</button>
+              <button className="history-close" type="button" onClick={closeActivityLog} aria-label="Close"><CloseIcon className="history-close__icon" /></button>
             </div>
             <div className="activity-filter-row">
               <label className="activity-filter-label">

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { CSSProperties, KeyboardEvent } from 'react';
+import { LockIcon, UnlockIcon } from '@/components/icons/ScoutIcons';
 
 type PasswordFieldProps = {
   value: string;
@@ -48,7 +49,7 @@ export default function PasswordField({
         aria-label={visible ? 'Hide password' : 'Show password'}
         tabIndex={-1}
       >
-        {visible ? '🔓' : '🔒'}
+        {visible ? <UnlockIcon className="password-field__icon" /> : <LockIcon className="password-field__icon" />}
       </button>
     </div>
   );

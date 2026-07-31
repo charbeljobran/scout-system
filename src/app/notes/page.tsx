@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { todayIso } from '@/lib/members';
+import { CloseIcon } from '@/components/icons/ScoutIcons';
 
 type NoteRow = {
   id: string;
@@ -402,7 +403,7 @@ export default function NotesPage() {
                 {viewingNote.title && <h2>{viewingNote.title}</h2>}
               </div>
               <button className="history-close" type="button" onClick={() => setViewingNote(null)} aria-label="Close">
-                ✕
+                <CloseIcon className="history-close__icon" />
               </button>
             </div>
             <div className="history-modal__body">

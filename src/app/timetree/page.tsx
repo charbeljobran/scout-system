@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { CalendarIcon } from '@/components/icons/ScoutIcons';
 
 // TimeTree doesn't use a custom URL scheme — it uses Universal Links /
 // App Links on its own short-link domain, timetr.ee (confirmed from a real
@@ -52,7 +53,7 @@ export default function TimeTreeRedirectPage() {
         <h1>TimeTree</h1>
       </div>
       <section className="panel accent-blue" aria-label="Open TimeTree" style={{ textAlign: 'center', padding: '40px 24px' }}>
-        <p style={{ fontSize: 40, marginBottom: 12 }}>📅</p>
+        <CalendarIcon className="timetree-hero-icon" />
 
         {(platform === 'ios' || platform === 'android') ? (
           <>
